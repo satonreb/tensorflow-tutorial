@@ -1,0 +1,15 @@
+name: tensorflow
+dependencies:
+  - python
+  # Analysis
+  - matplotlib
+  - seaborn
+  # Calculations
+  - scikit-learn
+  - numpy
+  # Reporting
+  - pandas
+  # TensorFlow
+  - pip
+  - pip:
+    - tensorflow
