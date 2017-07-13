@@ -1,7 +1,7 @@
-import tensorflow as tf
 import numpy as np
-import matplotlib.pyplot as plt
+import tensorflow as tf
 from sklearn.model_selection import TimeSeriesSplit
+
 
 # Data generation
 def gen_data(data, train_test_split, sequence_length):
@@ -63,7 +63,7 @@ cell_1_drop = tf.contrib.rnn.DropoutWrapper(cell_1, output_keep_prob=lstm_keep_p
 val_1, state_1 = tf.nn.static_rnn(cell=cell_1_drop, inputs=x_seq, dtype=tf.float32)
 last = val_1[-1]
 
-# Standart Dense bit:
+# Standard Dense bit:
 
 input_layer_size = 50
 W = tf.Variable(initial_value=tf.truncated_normal(shape=[input_layer_size, output_dim], stddev=0.1))
