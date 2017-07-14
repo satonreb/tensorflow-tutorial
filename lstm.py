@@ -3,6 +3,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.model_selection import TimeSeriesSplit
 
+# Data generation
+def gen_data(data, train_test_split, sequence_length):
+    sequence_length = sequence_length + 1
+    result = []
+    for index in range(len(data) - sequence_length+1):
+        result.append(data[index: index + sequence_length])
 
 def data_split(data, past_seq_len,  future_seq_len, future_seq_steps_ahead):
     steps_ahead = future_seq_steps_ahead-1
@@ -18,6 +24,7 @@ PAST_SEQUENCE_LENGTH = 5
 FUTURE_SEQUENCE_LENGTH = 2
 FUTURE_SEQUENCE_STEPS_AHEAD = 1
 TRAIN_SPLIT = 3
+SEQ_LEN = 10
 
 x = np.linspace(start=0, stop=2*np.pi, num=POINT_NUMBER)
 y = np.sin(x)
@@ -37,7 +44,7 @@ for train_index, test_index in tscv.split(y_past):
     x_past_train, x_past_test = x_past[train_index], x_past[test_index]
     y_past_train, y_past_test = y_past[train_index], y_past[test_index]
     x_future_train, x_future_test = x_future[train_index], x_future[test_index]
-    y_futuregit s_train, y_future_test = y_future[train_index], y_future[test_index]
+    y_future_train, y_future_test = y_future[train_index], y_future[test_index]
 
 
 a = y_past_train.reshape(y_past_train.shape, 1)

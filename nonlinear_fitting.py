@@ -1,19 +1,21 @@
-import tensorflow as tf
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import tensorflow as tf
 from sklearn.model_selection import train_test_split
 
 # CUSTOMIZABLE: Collect/Prepare data
-X_RANGE_MIN, X_RANGE_MAX = -np.pi, np.pi
-N = 1000
-TEST_SIZE = 0.33
+X_MIN = -2 * np.pi
+X_MAX = 2 * np.pi
+N = 100
+TEST_SIZE = 0.5
 EPOCHS = 10000
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 1e-2
+N_NEURONS = 50
 
 # Create data
-X = np.random.uniform(low=X_RANGE_MIN, high=X_RANGE_MAX, size=N)
-noise = np.random.normal(scale=0.01, size=X.size)
-y = (np.sin(X))+ noise
+X = np.random.uniform(low=X_MIN, high=X_MAX, size=N)
+noise = np.random.normal(scale=0.1, size=X.size)
+y = X ** 2 * (np.sin(X)) + noise
 
 # Split the data
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=TEST_SIZE)
@@ -35,12 +37,11 @@ y_true = tf.placeholder(tf.float32, shape=[None, output_layer_size])
 
 # Dense NN
 # First layer
-n_neurons = 50
-w1 = tf.Variable(initial_value=tf.truncated_normal(shape=[input_layer_size, n_neurons], stddev=0.1))
-b1 = tf.Variable(initial_value=tf.constant(value=0.1, shape=[n_neurons]))
+w1 = tf.Variable(initial_value=tf.truncated_normal(shape=[input_layer_size, N_NEURONS], stddev=0.1))
+b1 = tf.Variable(initial_value=tf.constant(value=0.1, shape=[N_NEURONS]))
 h1 = tf.nn.relu(tf.multiply(x=x, y=w1) + b1)
 # Output layer
-w2 = tf.Variable(initial_value=tf.truncated_normal(shape=[n_neurons, output_layer_size], stddev=0.1))
+w2 = tf.Variable(initial_value=tf.truncated_normal(shape=[N_NEURONS, output_layer_size], stddev=0.1))
 b2 = tf.Variable(initial_value=tf.constant(value=0.1, shape=[output_layer_size]))
 y_pred = tf.matmul(a=h1, b=w2) + b2
 
@@ -68,7 +69,7 @@ for i in range(EPOCHS):
 plt.scatter(X_test, y_test,  color='b')
 xx = np.sort(X_test, axis=0)
 yy = y_pred.eval(feed_dict={x: xx})
-plt.plot(xx, yy, color='r', linewidth=3)
+plt.plot(xx, yy, color='r', linewidth=1)
 plt.xlabel("X")
 plt.ylabel("y")
 plt.show()
