@@ -15,17 +15,15 @@ def data_split(data, past_seq_len,  future_seq_len, future_seq_steps_ahead):
     return data_past, data_future
 
 POINT_NUMBER = 1000
-PAST_SEQUENCE_LENGTH = 60
+PAST_SEQUENCE_LENGTH = 50
 FUTURE_SEQUENCE_LENGTH = 1
-FUTURE_SEQUENCE_STEPS_AHEAD = 1
-TRAIN_SPLIT = 3
-BATCH_SIZE = 30
+FUTURE_SEQUENCE_STEPS_AHEAD = 10
+TRAIN_SPLIT = 2
+BATCH_SIZE = 20
 N_ITERATIONS = 5000
+LSTM_NEURONS = 10
 
-# x = np.linspace(start=0, stop=4*np.pi, num=POINT_NUMBER)
-COEF = 10*np.pi
-NUM = int(POINT_NUMBER/2)
-X = np.concatenate((-COEF*np.sort(np.random.random(size=NUM)), COEF*np.sort(np.random.random(size=NUM))))
+X = np.linspace(start=-2*np.pi, stop=3*np.pi, num=POINT_NUMBER)
 y = np.sin(X)
 
 x_past, x_future = data_split(data=X,
@@ -53,28 +51,40 @@ y_output_test = y_future_test
 
 input_dim = PAST_SEQUENCE_LENGTH
 output_dim = FUTURE_SEQUENCE_LENGTH
-hidden_size = 50
+
+
+
+# TODO: What are shape parameters in x? [batch_count, Sequance_lenght, ??????] ?
+# TODO: Understand end explain LSTM bit: particularly, why have to use unstack? how to use static_rnn?
+# TODO: how to substitute it with dynamic_rnn? Why nothing works as expected?
+# TODO: Look into batch creation and evaluation of various things during computation time
+# TODO:
 
 # Define model
-x = tf.placeholder(dtype=tf.float32, shape=[None, input_dim, 1], name='x')
+x = tf.placeholder(dtype=tf.float32, shape=[None, PAST_SEQUENCE_LENGTH, 1], name='x')
 y_true = tf.placeholder(dtype=tf.float32, shape=[None, output_dim], name='truth')
 
 # LSTM (RNN) bit :
 x_seq = tf.unstack(value=x, num=input_dim, axis=1)
-cell = tf.nn.rnn_cell.LSTMCell(num_units=hidden_size)
-output, out_state = tf.nn.static_rnn(cell=cell, inputs=x_seq, dtype=tf.float32)
-
+cell = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_NEURONS)
+output, _ = tf.nn.static_rnn(cell=cell, inputs=x_seq, dtype=tf.float32)
 
 # Standard Dense bit:
-W = tf.Variable(initial_value=tf.truncated_normal(shape=[hidden_size, output_dim], stddev=0.1), name='weight')
-b = tf.Variable(initial_value=tf.constant(0.1, shape=[output_dim]), name='bias')
-y_pred = tf.add(x=tf.matmul(a=output[-1], b=W), y=b, name='prediction')
+# We use output[-1] here as we are only interested the output after whole seance has been looked at.
+# verison 1
+# W = tf.Variable(initial_value=tf.truncated_normal(shape=[hidden_size, output_dim], stddev=0.1), name='weight')
+# b = tf.Variable(initial_value=tf.constant(0.1, shape=[output_dim]), name='bias')
+# y_pred = tf.add(x=tf.matmul(a=output[-1], b=W), y=b, name='prediction')
+# verison 2
+# y_pred = tf.layers.dense(inputs=output[-1], units=output_dim)
+# verison 3
+y_pred = tf.contrib.layers.fully_connected(inputs=output[-1], num_outputs=output_dim, activation_fn=None)
+# Quenstion: Why would you need at least three ways to do same thing?
 
 # Define loss
 LEARNING_RATE = 1e-4
 cost = tf.reduce_mean(input_tensor=tf.square(x=(y_pred - y_true)))
 train_step = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE).minimize(loss=cost)
-
 
 # Run model
 sess = tf.InteractiveSession()
@@ -99,26 +109,26 @@ for s in range(N_ITERATIONS):
     feed_dict = {x: x_batch, y_true: y_batch}
     sess.run(fetches=train_step, feed_dict=feed_dict)
 
-y_future_sequences_train_predictions_tf = y_pred.eval(feed_dict={x: y_input_train})
-y_future_sequences_test_predictions_tf = y_pred.eval(feed_dict={x: y_input_test})
-
+y_predictions_train = y_pred.eval(feed_dict={x: y_input_train})
+y_predictions_test = y_pred.eval(feed_dict={x: y_input_test})
 
 marker_size = 3
-plt.scatter(x_future_train.flatten(), y_future_train.flatten(),
+plt.scatter(x_past_train, y_past_train,
             color='black',
             label='training',
             s=marker_size)
-plt.scatter(x_future_test.flatten(), y_future_test.flatten(),
+plt.scatter(x_past_test, y_past_test,
             color='red',
             label='test',
             s=marker_size)
-plt.scatter(x_future_train.flatten(), y_future_sequences_train_predictions_tf.flatten(),
+
+plt.scatter(x_future_train, y_predictions_train,
             color='cyan',
-            label='training - predicted (TensorFlow)',
+            label='training - predicted',
             s=marker_size)
-plt.scatter(x_future_test.flatten(), y_future_sequences_test_predictions_tf.flatten(),
+plt.scatter(x_future_test.flatten(), y_predictions_test.flatten(),
             color='orange',
-            label='test - predicted (TensorFlow)',
+            label='test - predicted',
             s=marker_size)
 
 plt.xlabel("x")

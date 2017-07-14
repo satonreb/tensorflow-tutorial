@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+import matplotlib.pyplot as plt
 
 # Script shows how to use TensorFlow for linear regression for multiple features and one class
 # and use batches for the training. In addition, create and save computational graphs and stuff.
@@ -7,7 +8,7 @@ import numpy as np
 # CUSTOMIZABLE: Collect/Prepare data
 datapoint_size = 1000
 batch_size = 1000
-steps = 10000
+steps = 10
 actual_b = 2
 feature_number = 5
 learning_rate = 0.001
@@ -27,22 +28,30 @@ for i in range(datapoint_size):
 all_xs = np.array(all_xs)
 all_ys = np.transpose([all_ys])
 
+idx = 600
+all_xs_train = all_xs[:idx, :]
+all_ys_train = all_ys[:idx]
+all_xs_test = all_xs[idx:, :]
+all_ys_test = all_ys[idx:]
+
 # Model construction
 # placeholder for input variable
 x = tf.placeholder(dtype=tf.float32, shape=[None, feature_number], name='x')
 
-# definition of weight matrix and bias vector
-W = tf.Variable(initial_value=tf.zeros([feature_number, 1]), name='W')
-b = tf.Variable(initial_value=tf.zeros([1]), name='b')
-
+# # definition of weight matrix and bias vector
+# W = tf.Variable(initial_value=tf.zeros([feature_number, 1]), name='W')
+# b = tf.Variable(initial_value=tf.zeros([1]), name='b')
+#
 # definition of outcome variable ( y = W1 * x1 + W2 * x2 + b )
-with tf.name_scope("model"):
-    product = tf.matmul(a=x, b=W)
-    y_pred = tf.add(x=product, y=b, name='prediction')
+# with tf.name_scope("model"):
+#     product = tf.matmul(a=x, b=W)
+#     y_pred = tf.add(x=product, y=b, name='prediction')
 # Add summary ops to collect data
-tf.summary.histogram("weights", W)
-tf.summary.histogram("biases", b)
-tf.summary.histogram("y", y_pred)
+# tf.summary.histogram("weights", W)
+# tf.summary.histogram("biases", b)
+# tf.summary.histogram("y", y_pred)
+
+y_pred = tf.contrib.layers.fully_connected(inputs=x, num_outputs=1, activation_fn=None)
 
 # placeholder for true outcome values
 y_true = tf.placeholder(dtype=tf.float32, shape=[None, 1], name='y_true')
@@ -82,14 +91,14 @@ for i in range(steps):
         batch_start_idx = (i * batch_size) % (datapoint_size - batch_size)
 
     batch_end_idx = batch_start_idx + batch_size
-    batch_xs = all_xs[batch_start_idx:batch_end_idx]
-    batch_ys = all_ys[batch_start_idx:batch_end_idx]
+    batch_xs = all_xs_train[batch_start_idx:batch_end_idx]
+    batch_ys = all_ys_train[batch_start_idx:batch_end_idx]
     xs = np.array(batch_xs)
     ys = np.array(batch_ys)
 
     # training
     if i % 10 == 0:
-        all_feed = {x: all_xs, y_true: all_ys}
+        all_feed = {x: all_xs_train, y_true: all_ys_train}
         result = sess.run(fetches=merged, feed_dict=all_feed)
         writer.add_summary(summary=result, global_step=i)
     else:
@@ -97,5 +106,11 @@ for i in range(steps):
         sess.run(fetches=train_step, feed_dict=feed)
         print("Iteration {iter} and cost is {cost} ".format(iter=i, cost=sess.run(fetches=cost, feed_dict=feed)))
 
-print("Actual: W={W} and  b={b}".format(W=actual_W, b=actual_b))
-print("Predicted: W={W} and  b={b}".format(W=sess.run(fetches=W), b=sess.run(fetches=b)))
+# print("Actual: W={W} and  b={b}".format(W=actual_W, b=actual_b))
+# print("Predicted: W={W} and  b={b}".format(W=sess.run(fetches=W), b=sess.run(fetches=b)))
+
+y_predictions_tf = y_pred.eval(feed_dict={x: all_xs_test}, session=sess)
+
+marker_size = 6
+plt.scatter(np.arange(0, len(y_predictions_tf), step=1), y_predictions_tf, color='black', label='training', s=marker_size*4)
+plt.scatter(np.arange(0, len(all_ys_test), step=1), all_ys_test, color='orange', label='training', s=marker_size/2)
