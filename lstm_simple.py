@@ -14,17 +14,17 @@ def data_split(data, past_seq_len,  future_seq_len, future_seq_steps_ahead):
         for index in range(seq_number)])
     return data_past, data_future
 
-POINT_NUMBER = 1000
-PAST_SEQUENCE_LENGTH = 50
+POINT_NUMBER = 1500
+PAST_SEQUENCE_LENGTH = 60
 FUTURE_SEQUENCE_LENGTH = 1
 FUTURE_SEQUENCE_STEPS_AHEAD = 10
 TRAIN_SPLIT = 2
-BATCH_SIZE = 20
-N_ITERATIONS = 5000
-LSTM_NEURONS = 10
+BATCH_SIZE = 30
+N_ITERATIONS = 15000
+LSTM_NEURONS = 542
 
-X = np.linspace(start=-2*np.pi, stop=3*np.pi, num=POINT_NUMBER)
-y = np.sin(X)
+X = np.linspace(start=-8*np.pi, stop=8*np.pi, num=POINT_NUMBER)
+y = X*np.sin(X)
 
 x_past, x_future = data_split(data=X,
                               past_seq_len=PAST_SEQUENCE_LENGTH,
@@ -49,25 +49,19 @@ y_output_train = y_future_train
 y_input_test = np.expand_dims(a=y_past_test, axis=2)
 y_output_test = y_future_test
 
-input_dim = PAST_SEQUENCE_LENGTH
-output_dim = FUTURE_SEQUENCE_LENGTH
-
-
-
-# TODO: What are shape parameters in x? [batch_count, Sequance_lenght, ??????] ?
+# TODO: What are shape parameters in x? [batch_count, sequance_lenght, ??????] ?
 # TODO: Understand end explain LSTM bit: particularly, why have to use unstack? how to use static_rnn?
 # TODO: how to substitute it with dynamic_rnn? Why nothing works as expected?
 # TODO: Look into batch creation and evaluation of various things during computation time
-# TODO:
 
 # Define model
 x = tf.placeholder(dtype=tf.float32, shape=[None, PAST_SEQUENCE_LENGTH, 1], name='x')
-y_true = tf.placeholder(dtype=tf.float32, shape=[None, output_dim], name='truth')
+y_true = tf.placeholder(dtype=tf.float32, shape=[None, FUTURE_SEQUENCE_LENGTH], name='truth')
 
 # LSTM (RNN) bit :
-x_seq = tf.unstack(value=x, num=input_dim, axis=1)
+inputs = tf.unstack(value=x, num=PAST_SEQUENCE_LENGTH, axis=1)
 cell = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_NEURONS)
-output, _ = tf.nn.static_rnn(cell=cell, inputs=x_seq, dtype=tf.float32)
+output, _ = tf.nn.static_rnn(cell=cell, inputs=inputs, dtype=tf.float32)
 
 # Standard Dense bit:
 # We use output[-1] here as we are only interested the output after whole seance has been looked at.
@@ -78,7 +72,7 @@ output, _ = tf.nn.static_rnn(cell=cell, inputs=x_seq, dtype=tf.float32)
 # verison 2
 # y_pred = tf.layers.dense(inputs=output[-1], units=output_dim)
 # verison 3
-y_pred = tf.contrib.layers.fully_connected(inputs=output[-1], num_outputs=output_dim, activation_fn=None)
+y_pred = tf.contrib.layers.fully_connected(inputs=output[-1], num_outputs=FUTURE_SEQUENCE_LENGTH, activation_fn=None)
 # Quenstion: Why would you need at least three ways to do same thing?
 
 # Define loss
