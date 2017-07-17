@@ -14,14 +14,14 @@ def data_split(data, past_seq_len,  future_seq_len, future_seq_steps_ahead):
         for index in range(seq_number)])
     return data_past, data_future
 
-POINT_NUMBER = 1500
-PAST_SEQUENCE_LENGTH = 60
+POINT_NUMBER = 200
+PAST_SEQUENCE_LENGTH = 5
 FUTURE_SEQUENCE_LENGTH = 1
 FUTURE_SEQUENCE_STEPS_AHEAD = 10
 TRAIN_SPLIT = 2
-BATCH_SIZE = 30
-N_ITERATIONS = 15000
-LSTM_NEURONS = 542
+BATCH_SIZE = 6
+N_ITERATIONS = 2000
+LSTM_NEURONS = 2
 
 X = np.linspace(start=-8*np.pi, stop=8*np.pi, num=POINT_NUMBER)
 y = X*np.sin(X)
@@ -59,9 +59,9 @@ x = tf.placeholder(dtype=tf.float32, shape=[None, PAST_SEQUENCE_LENGTH, 1], name
 y_true = tf.placeholder(dtype=tf.float32, shape=[None, FUTURE_SEQUENCE_LENGTH], name='truth')
 
 # LSTM (RNN) bit :
-inputs = tf.unstack(value=x, num=PAST_SEQUENCE_LENGTH, axis=1)
 cell = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_NEURONS)
-output, _ = tf.nn.static_rnn(cell=cell, inputs=inputs, dtype=tf.float32)
+output, _ = tf.nn.dynamic_rnn(cell=cell, inputs=x, dtype=tf.float32)
+
 
 # Standard Dense bit:
 # We use output[-1] here as we are only interested the output after whole seance has been looked at.
