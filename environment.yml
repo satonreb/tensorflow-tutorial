@@ -13,4 +13,4 @@ dependencies:
   - pip
   - pip:
     - tensorflow
-    - Keras
+    - keras
