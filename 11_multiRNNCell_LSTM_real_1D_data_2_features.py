@@ -51,9 +51,11 @@ DATA_PATH = "data/euro-foreign-exchange-reference-.csv"
 
 df = pd.read_csv(DATA_PATH)
 df = df[:-3]
-df['Date'] = df['Date'].map(lambda st: pd.datetime.strptime(st, '%Y-%m-%d'))
+df['Date'] = df['Date'].map(lambda st: pd.datetime.strptime(st, '%Y-%m-%d').timestamp())
 
-X = np.array(df['Date'])
+latest_timestamp = np.max(df['Date'])
+
+X = np.array(df['Date']/latest_timestamp)  # there are much much more things to do
 y = np.array(df['Euro foreign exchange reference rates'])
 
 x_input, x_output = data_split(data=X,
@@ -66,10 +68,14 @@ y_input, y_output = data_split(data=y,
                                output_seq_len=OUTPUT_SEQUENCE_LENGTH,
                                output_seq_steps_ahead=OUTPUT_SEQUENCE_STEPS_AHEAD)
 
+
+input = np.array([[[y_input[i, j], x_input[i, j]] for j in range(x_input.shape[1])] for i in range(x_input.shape[0])])
+
 data_split = TimeSeriesSplit(n_splits=TRAIN_SPLIT)
 for train_index, test_index in data_split.split(y_input):
-    x_input_train, x_input_test = x_input[train_index], x_input[test_index]
-    y_input_train, y_input_test = y_input[train_index], y_input[test_index]
+    y_input_train, y_input_test = input[train_index], input[test_index]
+    # x_input_train, x_input_test = x_input[train_index], x_input[test_index]
+    # y_input_train, y_input_test = y_input[train_index], y_input[test_index]
     x_output_train, x_output_test = x_output[train_index], x_output[test_index]
     y_output_train, y_output_test = y_output[train_index], y_output[test_index]
 
@@ -81,15 +87,15 @@ y_input_test_mod = y_input_test
 # a.shape
 # y_input_train_mod.shape
 # ======================================================================================================================
-
+FEATURES = input.shape[2]
 # Define model
 with tf.name_scope('INPUT'):
     # Input accepts arbitrary length sequence as input variable
-    x = tf.placeholder(dtype=tf.float32, shape=[None, INPUT_SEQUENCE_LENGTH], name='X')
+    x = tf.placeholder(dtype=tf.float32, shape=[None, INPUT_SEQUENCE_LENGTH, FEATURES], name='X')
     # x = tf.placeholder(dtype=tf.float32, shape=[None, None], name='x')
     # Input is of size [BATCH_COUNT, SEQUENCE_LENGTH, N_CLASSES]
-    inputs = tf.expand_dims(input=x, axis=2)
-    variable_summaries(inputs)
+    # inputs = tf.expand_dims(input=x, axis=2)
+    variable_summaries(x)
 # Define RNN bit
 with tf.name_scope('RNN'):
     lstm_1 = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_1_N)
@@ -97,7 +103,7 @@ with tf.name_scope('RNN'):
     lstm_2 = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_1_N * 4)
     lstm_2 = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_1_N * 8)
     cells = tf.nn.rnn_cell.MultiRNNCell(cells=[lstm_1, lstm_2])
-    rnn_output, _ = tf.nn.dynamic_rnn(cell=cells, inputs=inputs, dtype=tf.float32)
+    rnn_output, _ = tf.nn.dynamic_rnn(cell=cells, inputs=x, dtype=tf.float32)
     # rnn_dropout = tf.nn.dropout(x=rnn_output, keep_prob=0.5)
 
 # Standard Dense bit
@@ -151,7 +157,7 @@ y_predictions_train = y_pred.eval(feed_dict={x: y_input_train_mod})
 y_predictions_test = y_pred.eval(feed_dict={x: y_input_test_mod})
 # ======================================================================================================================
 marker_size = 3
-plt.plot(x_input_train, y_input_train,
+plt.plot(y_input_train[:,:,1], y_input_train[:,:,0],
          color='black',
          label='train-input')
 
@@ -163,9 +169,10 @@ plt.plot(x_output_train, y_predictions_train,
          color='blue',
          label='train-prediction')
 
-plt.plot(x_input_test, y_input_test,
+plt.plot(y_input_test[:,:,1], y_input_test[:,:,0],
          color='cyan',
          label='test-input')
+
 
 plt.plot(x_output_test, y_output_test,
          color='green',
