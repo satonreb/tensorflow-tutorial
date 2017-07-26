@@ -17,7 +17,7 @@ def data_split(data, input_seq_len, output_seq_len, output_seq_steps_ahead):
 
 POINT_NUMBER = 6000
 INPUT_SEQUENCE_LENGTH = 10
-OUTPUT_SEQUENCE_LENGTH = 3
+OUTPUT_SEQUENCE_LENGTH = 1
 OUTPUT_SEQUENCE_STEPS_AHEAD = 1
 TRAIN_SPLIT = 2
 BATCH_SIZE = 50

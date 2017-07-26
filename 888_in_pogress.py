@@ -1,180 +1,181 @@
-"""
-A Recurrent Neural Network (LSTM) implementation example using TensorFlow library.
-Inspired by https://github.com/aymericdamien/TensorFlow-Examples/
-"""
-from __future__ import print_function
-import numpy as np
-from typing import Optional, Tuple
 import matplotlib.pyplot as plt
-from tensorflow.contrib import rnn
-# noinspection PyUnresolvedReferences
-import seaborn as sns
-
+import numpy as np
 import tensorflow as tf
+from sklearn.model_selection import TimeSeriesSplit
+
+# ======================================================================================================================
+# Resets the graph
+tf.reset_default_graph()
 
 
-def generate_sample(f: Optional[float] = 1.0, t0: Optional[float] = None, batch_size: int = 1,
-                    predict: int = 50, samples: int = 100) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Generates data samples.
-    :param f: The frequency to use for all time series or None to randomize.
-    :param t0: The time offset to use for all time series or None to randomize.
-    :param batch_size: The number of time series to generate.
-    :param predict: The number of future samples to generate.
-    :param samples: The number of past (and current) samples to generate.
-    :return: Tuple that contains the past times and values as well as the future times and values. In all outputs,
-             each row represents one time series of the batch.
-    """
-    Fs = 100
+# ======================================================================================================================
+# Data generation
 
-    T = np.empty((batch_size, samples))
-    Y = np.empty((batch_size, samples))
-    FT = np.empty((batch_size, predict))
-    FY = np.empty((batch_size, predict))
 
-    _t0 = t0
-    for i in range(batch_size):
-        t = np.arange(0, samples + predict) / Fs
-        if _t0 is None:
-            t0 = np.random.rand() * 2 * np.pi
-        else:
-            t0 = _t0 + i/float(batch_size)
+def data_split(data, input_seq_len, output_seq_len, output_seq_steps_ahead):
+    steps_ahead = output_seq_steps_ahead - 1
+    seq_number = len(data) + 1 - steps_ahead - input_seq_len - output_seq_len
+    data_input = np.array([data[index: index + input_seq_len] for index in range(seq_number)])
+    data_output = np.array([
+        data[index + input_seq_len + steps_ahead: index + input_seq_len + steps_ahead + output_seq_len]
+        for index in range(seq_number)])
+    return data_input, data_output
 
-        freq = f
-        if freq is None:
-            freq = np.random.rand() * 3.5 + 0.5
 
-        y = np.sin(2 * np.pi * freq * (t + t0))
+POINT_NUMBER = 1000
+INPUT_SEQUENCE_LENGTH = 10
+OUTPUT_SEQUENCE_LENGTH = 2
+OUTPUT_SEQUENCE_STEPS_AHEAD = 50
+TRAIN_SPLIT = 2
+BATCH_SIZE = 50
+N_ITERATIONS = 30000
+LSTM_NEURONS = 10
+LEARNING_RATE = 1e-4
 
-        T[i, :] = t[0:samples]
-        Y[i, :] = y[0:samples]
+COEF = 10 * np.pi
+X = np.linspace(start=-COEF, stop=COEF, num=POINT_NUMBER)
+y = np.sin(X)
 
-        FT[i, :] = t[samples:samples + predict]
-        FY[i, :] = y[samples:samples + predict]
+x_input, x_output = data_split(data=X,
+                               input_seq_len=INPUT_SEQUENCE_LENGTH,
+                               output_seq_len=OUTPUT_SEQUENCE_LENGTH,
+                               output_seq_steps_ahead=OUTPUT_SEQUENCE_STEPS_AHEAD)
 
-    return T, Y, FT, FY
+y_input, y_output = data_split(data=y,
+                               input_seq_len=INPUT_SEQUENCE_LENGTH,
+                               output_seq_len=OUTPUT_SEQUENCE_LENGTH,
+                               output_seq_steps_ahead=OUTPUT_SEQUENCE_STEPS_AHEAD)
 
-# def RNN(x, weights, biases, n_input, n_steps, n_hidden):
+data_split = TimeSeriesSplit(n_splits=TRAIN_SPLIT)
+for train_index, test_index in data_split.split(y_input):
+    x_input_train, x_input_test = x_input[train_index], x_input[test_index]
+    y_input_train, y_input_test = y_input[train_index], y_input[test_index]
+    x_output_train, x_output_test = x_output[train_index], x_output[test_index]
+    y_output_train, y_output_test = y_output[train_index], y_output[test_index]
+
+y_input_train_mod = y_input_train
+y_input_test_mod = y_input_test
+
+# a = np.array([[[1], [2], [3], [4], [5], [6], [7], [8], [9], [10]], [[21], [22], [23], [24], [25], [26], [27], [28], [29], [30]],[[41], [42], [43], [44], [45], [46], [47], [48], [49], [50]]])
+# a.shape
+# y_input_train_mod.shape
+
+# ======================================================================================================================
+# Define model
+with tf.name_scope('inputs'):
+    # Input accepts arbitrary length sequence as input variable
+    x = tf.placeholder(dtype=tf.float32, shape=[None, INPUT_SEQUENCE_LENGTH], name='x')
+    # x = tf.placeholder(dtype=tf.float32, shape=[None, None], name='x')
+    # Input is of size [BATCH_COUNT, SEQUENCE_LENGTH, N_CLASSES]
+    inputs = tf.expand_dims(input=x, axis=2, name='x_dim_expand')
+
+# ======================================================================================================================
+
+# # Define Encoder LSTM (RNN) bit
+# with tf.name_scope('encoder'):
+#     encoder_cell = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_NEURONS)
+#     # encoder_lstm_output, _ = tf.nn.dynamic_rnn(cell=encoder_cell, inputs=inputs, dtype=tf.float32)
 #
-#     # Prepare data shape to match `rnn` function requirements
-#     # Current data input shape: (batch_size, n_steps, n_input)
-#     # Required shape: 'n_steps' tensors list of shape (batch_size, n_input)
+# # Define Decoder LSTM (RNN) bit
+# with tf.name_scope('decoder'):
+#     decoder_cell = tf.nn.rnn_cell.LSTMCell(num_units=OUTPUT_SEQUENCE_LENGTH)
 #
-#     # Permuting batch_size and n_steps
-#     x = tf.transpose(x, [1, 0, 2])
-#     # Reshaping to (n_steps*batch_size, n_input)
-#     x = tf.reshape(x, [-1, n_input])
-#     # Split to get a list of 'n_steps' tensors of shape (batch_size, n_input)
-#     x = tf.split(x, n_steps, axis=0)
+#     cells = tf.nn.rnn_cell.MultiRNNCell(cells=[encoder_cell, decoder_cell])
 #
-#     # Define a lstm cell with tensorflow
-#     lstm_cell = rnn.BasicLSTMCell(n_hidden, forget_bias=1.0)
+#     rnn_output, _ = tf.nn.dynamic_rnn(cell=cells, inputs=inputs, dtype=tf.float32)
 #
-#     # Get lstm cell output
-#     outputs, states = rnn.static_rnn(lstm_cell, x, dtype=tf.float32)
 #
-#     # Linear activation, using rnn inner loop last output
-#     return tf.nn.bias_add(tf.matmul(outputs[-1], weights['out']), biases['out'])
+# # Standard Dense bit
+# with tf.name_scope('FC'):
+#     output = tf.transpose(a=rnn_output, perm=[1, 0, 2])
+#     y_pred = tf.layers.dense(inputs=output[-1], units=1)
 
 
+# Define Encoder LSTM (RNN) bit
+with tf.name_scope('rnn'):
+    encoder_cell = tf.nn.rnn_cell.LSTMCell(num_units=OUTPUT_SEQUENCE_LENGTH)
+    rnn_output, _ = tf.nn.dynamic_rnn(cell=encoder_cell, inputs=inputs, dtype=tf.float32)
+    result = tf.transpose(a=rnn_output, perm=[1, 0, 2])
+    prediction = result[-1]
+    y_pred = tf.expand_dims(input=prediction, axis=2)
 
-# Parameters
-learning_rate = 0.001
-training_iters = 20000
-batch_size = 50
-display_step = 100
+# ======================================================================================================================
+# Define loss
+with tf.name_scope('loss'):
+    y_true_1 = tf.placeholder(dtype=tf.float32, shape=[None, OUTPUT_SEQUENCE_LENGTH], name='truth')
+    y_true = tf.expand_dims(input=y_true_1, axis=2)
 
-# Network Parameters
-n_input = 1  # input is sin(x)
-n_steps = 100  # timesteps
-n_hidden = 100  # hidden layer num of features
-n_outputs = 50  # output is sin(x+1)
+    # y_true = tf.placeholder(dtype=tf.float32, shape=[None, None], name='truth')
+    cost = tf.reduce_mean(input_tensor=tf.square(x=(y_pred - y_true)))
+    tf.summary.scalar('cost', cost)
 
-# tf Graph input
-x = tf.placeholder("float", [None, n_steps, n_input])
-y = tf.placeholder("float", [None, n_outputs])
+with tf.name_scope('train'):
+    train_step = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE).minimize(loss=cost)
 
-# Define weights
-weights = {
-    'out': tf.Variable(tf.random_normal([n_hidden, n_outputs]))
-}
-biases = {
-    'out': tf.Variable(tf.random_normal([n_outputs]))
-}
+# ======================================================================================================================
+# Run model
+sess = tf.InteractiveSession()
+sess.run(fetches=tf.global_variables_initializer())
 
-# Prepare data shape to match `rnn` function requirements
-# Current data input shape: (batch_size, n_steps, n_input)
-# Required shape: 'n_steps' tensors list of shape (batch_size, n_input)
+log_file = "graphs/lstm_simple/dynamic"
+merged = tf.summary.merge_all()
+writer = tf.summary.FileWriter(log_file, sess.graph)
 
-# Permuting batch_size and n_steps
-lstm_x = tf.transpose(x, [1, 0, 2])
-# Reshaping to (n_steps*batch_size, n_input)
-lstm_x = tf.reshape(lstm_x, [-1, n_input])
-# Split to get a list of 'n_steps' tensors of shape (batch_size, n_input)
-lstm_x = tf.split(lstm_x, n_steps, axis=0)
+input_size = len(y_input_train_mod)
+for s in range(N_ITERATIONS):
+    ind_n = np.random.choice(a=input_size, size=BATCH_SIZE, replace=False)
+    x_batch = y_input_train_mod[ind_n]
+    y_batch = y_output_train[ind_n]
 
-# last_x_2 = tf.unstack(value=x, axis=1)
+    feed_dict = {x: x_batch, y_true: y_batch}
+    sess.run(fetches=train_step, feed_dict=feed_dict)
 
-# Define a lstm cell with tensorflow
-lstm_cell = rnn.BasicLSTMCell(n_hidden, forget_bias=1.0)
+    if s % 100 == 0:
+        train_loss = cost.eval(feed_dict={x: y_input_train_mod, y_true: y_output_train})
+        val_loss = cost.eval(feed_dict={x: y_input_test_mod, y_true: y_output_test})
 
-# Get lstm cell output
-outputs, states = rnn.static_rnn(lstm_cell, lstm_x, dtype=tf.float32)
+        msg = "step: {e}/{steps}, loss: {tr_e}, val_loss: {ts_e} ".format(e=s, steps=N_ITERATIONS,
+                                                                          tr_e=train_loss, ts_e=val_loss)
+        print(msg)
 
-# Linear activation, using rnn inner loop last output
-pred = tf.nn.bias_add(tf.matmul(outputs[-1], weights['out']), biases['out'])
+        summary = merged.eval(feed_dict={x: y_input_test_mod, y_true: y_output_test})
+        writer.add_summary(summary, s)
 
-# pred = RNN(x, weights, biases, n_input, n_steps, n_hidden)
+y_predictions_train = y_pred.eval(feed_dict={x: y_input_train_mod})
+y_predictions_test = y_pred.eval(feed_dict={x: y_input_test_mod})
 
-# Define loss (Euclidean distance) and optimizer
-individual_losses = tf.reduce_sum(tf.squared_difference(pred, y), reduction_indices=1)
-loss = tf.reduce_mean(individual_losses)
-optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss)
+marker_size = 3
+plt.scatter(x_input_train, y_input_train,
+            color='black',
+            label='train-input',
+            s=marker_size * 10)
 
-# Initializing the variables
-init = tf.global_variables_initializer()
+plt.scatter(x_output_train, y_output_train,
+            color='red',
+            label='train-output',
+            s=marker_size * 5)
 
-# Launch the graph
-with tf.Session() as sess:
-    sess.run(init)
-    step = 1
-    # Keep training until reach max iterations
-    while step * batch_size < training_iters:
-        _, batch_x, __, batch_y = generate_sample(f=1.0, t0=None, batch_size=batch_size, samples=n_steps, predict=n_outputs)
+plt.scatter(x_output_train, y_predictions_train,
+            color='blue',
+            label='train-prediction',
+            s=marker_size)
 
-        batch_x = batch_x.reshape((batch_size, n_steps, n_input))
-        batch_y = batch_y.reshape((batch_size, n_outputs))
+plt.scatter(x_input_test, y_input_test,
+            color='cyan',
+            label='test-input',
+            s=marker_size * 10)
 
-        # Run optimization op (backprop)
-        sess.run(optimizer, feed_dict={x: batch_x, y: batch_y})
-        if step % display_step == 0:
-            # Calculate batch loss
-            loss_value = sess.run(loss, feed_dict={x: batch_x, y: batch_y})
-            print("Iter " + str(step*batch_size) + ", Minibatch Loss= " + \
-                  "{:.6f}".format(loss_value))
-        step += 1
-    print("Optimization Finished!")
+plt.scatter(x_output_test, y_output_test,
+            color='green',
+            label='test-output',
+            s=marker_size * 5)
 
-    # Test the prediction
-    n_tests = 3
-    for i in range(1, n_tests+1):
-        plt.subplot(n_tests, 1, i)
-        t, y, next_t, expected_y = generate_sample(f=i, t0=None, samples=n_steps, predict=n_outputs)
+plt.scatter(x_output_test, y_predictions_test,
+            color='orange',
+            label='test-prediction',
+            s=marker_size)
 
-        test_input = y.reshape((1, n_steps, n_input))
-        prediction = sess.run(pred, feed_dict={x: test_input})
-
-        # remove the batch size dimensions
-        t = t.squeeze()
-        y = y.squeeze()
-        next_t = next_t.squeeze()
-        prediction = prediction.squeeze()
-
-        plt.plot(t, y, color='black')
-        plt.plot(np.append(t[-1], next_t), np.append(y[-1], expected_y), color='green', linestyle=':')
-        plt.plot(np.append(t[-1], next_t), np.append(y[-1], prediction), color='red')
-        plt.ylim([-1.1, 1.1])
-        plt.xlabel('time [t]')
-        plt.ylabel('signal')
-
-    plt.show()
+plt.xlabel("x")
+plt.ylabel("y")
+plt.grid()
+plt.legend()

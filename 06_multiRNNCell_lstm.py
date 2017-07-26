@@ -3,8 +3,14 @@ import numpy as np
 import tensorflow as tf
 from sklearn.model_selection import TimeSeriesSplit
 
+# ======================================================================================================================
+# Resets the graph
+tf.reset_default_graph()
 
+# ======================================================================================================================
 # Data generation
+
+
 def data_split(data, input_seq_len, output_seq_len, output_seq_steps_ahead):
     steps_ahead = output_seq_steps_ahead - 1
     seq_number = len(data) + 1 - steps_ahead - input_seq_len - output_seq_len
@@ -17,13 +23,13 @@ def data_split(data, input_seq_len, output_seq_len, output_seq_steps_ahead):
 
 POINT_NUMBER = 6000
 INPUT_SEQUENCE_LENGTH = 10
-OUTPUT_SEQUENCE_LENGTH = 1
+OUTPUT_SEQUENCE_LENGTH = 3
 OUTPUT_SEQUENCE_STEPS_AHEAD = 1
 TRAIN_SPLIT = 2
-BATCH_SIZE = 50
+BATCH_SIZE = 70
 N_ITERATIONS = 10000
-LSTM_NEURONS = 11
-LEARNING_RATE = 1e-4
+LSTM_NEURONS = 50
+LEARNING_RATE = 1e-3
 
 COEF = 10 * np.pi
 X = np.linspace(start=-COEF, stop=COEF, num=POINT_NUMBER)
@@ -49,24 +55,35 @@ for train_index, test_index in data_split.split(y_input):
 y_input_train_mod = y_input_train
 y_input_test_mod = y_input_test
 
+# ======================================================================================================================
 # Define model
 with tf.name_scope('inputs'):
-    x = tf.placeholder(dtype=tf.float32, shape=[None, INPUT_SEQUENCE_LENGTH], name='x')
+    # Input accepts arbitrary length sequence as input variable
+    x = tf.placeholder(dtype=tf.float32, shape=[None, None], name='x')
+    # Input is of size [BATCH_COUNT, SEQUENCE_LENGTH, N_CLASSES]
     inputs = tf.expand_dims(input=x, axis=2, name='x_dim_expand')
 
-# LSTM (RNN) bit :
-# Input has to be of size [BATCH_COUNT, SEQUENCE_LENGTH, N_CLASSES]
-with tf.name_scope('rnn'):
-    cell = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_NEURONS)
-    lstm_output, _ = tf.nn.dynamic_rnn(cell=cell, inputs=inputs, dtype=tf.float32)
+# ======================================================================================================================
 
-# Standard Dense bit:
+# Define Encoder LSTM (RNN) bit
+with tf.name_scope('encoder'):
+    encoder_cell = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_NEURONS)
+    # encoder_lstm_output, _ = tf.nn.dynamic_rnn(cell=encoder_cell, inputs=inputs, dtype=tf.float32)
+
+# Define Decoder LSTM (RNN) bit
+with tf.name_scope('decoder'):
+    decoder_cell = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_NEURONS)
+
+    cells = tf.nn.rnn_cell.MultiRNNCell(cells=[encoder_cell, decoder_cell])
+
+    rnn_output, _ = tf.nn.dynamic_rnn(cell=cells, inputs=inputs, dtype=tf.float32)
+
+# Standard Dense bit
 with tf.name_scope('FC'):
-    output = tf.transpose(a=lstm_output, perm=[1, 0, 2])
-    # last = tf.gather(params=output, indices=(output.get_shape()[0]) - 1)
-
+    output = tf.transpose(a=rnn_output, perm=[1, 0, 2])
     y_pred = tf.layers.dense(inputs=output[-1], units=OUTPUT_SEQUENCE_LENGTH)
 
+# ======================================================================================================================
 # Define loss
 with tf.name_scope('loss'):
     y_true = tf.placeholder(dtype=tf.float32, shape=[None, OUTPUT_SEQUENCE_LENGTH], name='truth')
@@ -76,6 +93,7 @@ with tf.name_scope('loss'):
 with tf.name_scope('train'):
     train_step = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE).minimize(loss=cost)
 
+# ======================================================================================================================
 # Run model
 sess = tf.InteractiveSession()
 sess.run(fetches=tf.global_variables_initializer())
