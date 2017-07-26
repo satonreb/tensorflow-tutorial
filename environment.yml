@@ -3,7 +3,6 @@ dependencies:
   - python
   # Analysis
   - matplotlib
-  - seaborn
   # Calculations
   - scikit-learn
   - numpy
@@ -13,4 +12,3 @@ dependencies:
   - pip
   - pip:
     - tensorflow
-    - keras
