@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
+# import pandas as pd
 import tensorflow as tf
 from sklearn.model_selection import TimeSeriesSplit
 
@@ -10,7 +10,6 @@ tf.reset_default_graph()
 
 
 # ======================================================================================================================
-
 
 def variable_summaries(var):
     """Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
@@ -38,148 +37,155 @@ def data_split(data, input_seq_len, output_seq_len, output_seq_steps_ahead):
     return data_input, data_output
 
 
-INPUT_SEQUENCE_LENGTH = 14
+INPUT_SEQUENCE_LENGTH = 5
 OUTPUT_SEQUENCE_LENGTH = 1
-OUTPUT_SEQUENCE_STEPS_AHEAD = 7
-TRAIN_SPLIT = 2
-BATCH_SIZE = 100
-N_ITERATIONS = 50000
-LSTM_1_N = 32
-HIDDEN_FC_N = 512
-LEARNING_RATE = 1e-4
-DATA_PATH = "data/euro-foreign-exchange-reference-.csv"
+OUTPUT_SEQUENCE_STEPS_AHEAD = 10
+N_SPLITS = 2
+BATCH_SIZE = 70
+N_ITERATIONS = 5000
+learning_rate_decay_steps = 500
+learning_rate_decay_rate = 0.96
+LSTM_1_N = 4
+FC_1_N = 10
+INITIAL_LEARNING_RATE = 1e-2
+L2_REG_BETA = 0.03
+# DATA_PATH = "data/euro-foreign-exchange-reference-.csv"
 
-df = pd.read_csv(DATA_PATH)
-df = df[:-3]
-df['Date'] = df['Date'].map(lambda st: pd.datetime.strptime(st, '%Y-%m-%d').timestamp())
+# df = pd.read_csv(DATA_PATH)
+# df = df[:-3]
+# df['Date'] = df['Date'].map(lambda st: pd.datetime.strptime(st, '%Y-%m-%d'))
+#
+# X = np.array(df['Date'])
+# Y = np.array(df['Euro foreign exchange reference rates'])
 
-latest_timestamp = np.max(df['Date'])
+X = np.linspace(start=-5 * np.pi, stop=10 * np.pi, num=500)
+Y = np.sin(X)
 
-X = np.array(df['Date']/latest_timestamp)  # there are much much more things to do
-y = np.array(df['Euro foreign exchange reference rates'])
+# plt.plot(X, Y)
 
 x_input, x_output = data_split(data=X,
                                input_seq_len=INPUT_SEQUENCE_LENGTH,
                                output_seq_len=OUTPUT_SEQUENCE_LENGTH,
                                output_seq_steps_ahead=OUTPUT_SEQUENCE_STEPS_AHEAD)
 
-y_input, y_output = data_split(data=y,
+y_input, y_output = data_split(data=Y,
                                input_seq_len=INPUT_SEQUENCE_LENGTH,
                                output_seq_len=OUTPUT_SEQUENCE_LENGTH,
                                output_seq_steps_ahead=OUTPUT_SEQUENCE_STEPS_AHEAD)
 
-
-input = np.array([[[y_input[i, j], x_input[i, j]] for j in range(x_input.shape[1])] for i in range(x_input.shape[0])])
-
-data_split = TimeSeriesSplit(n_splits=TRAIN_SPLIT)
+data_split = TimeSeriesSplit(n_splits=N_SPLITS)
 for train_index, test_index in data_split.split(y_input):
-    y_input_train, y_input_test = input[train_index], input[test_index]
-    # x_input_train, x_input_test = x_input[train_index], x_input[test_index]
-    # y_input_train, y_input_test = y_input[train_index], y_input[test_index]
+    x_input_train, x_input_test = x_input[train_index], x_input[test_index]
+    y_input_train, y_input_test = y_input[train_index], y_input[test_index]
     x_output_train, x_output_test = x_output[train_index], x_output[test_index]
     y_output_train, y_output_test = y_output[train_index], y_output[test_index]
 
-y_input_train_mod = y_input_train
-y_input_test_mod = y_input_test
-
+# plt.scatter(x_input_train.flatten(), y_input_train.flatten())
 # ======================================================================================================================
 # a = np.array([[[1], [2], [3], [4], [5]], [[21], [22], [23], [24], [25]],[[41], [42], [43], [44], [45]]])
 # a.shape
-# y_input_train_mod.shape
+# y_input_train.shape
 # ======================================================================================================================
-FEATURES = input.shape[2]
+
 # Define model
-with tf.name_scope('INPUT'):
+with tf.name_scope('SETUP'):
+    global_step = tf.Variable(0, trainable=False)
+    learning_rate = tf.train.exponential_decay(learning_rate=INITIAL_LEARNING_RATE, global_step=global_step,
+                                               decay_steps=learning_rate_decay_steps,
+                                               decay_rate=learning_rate_decay_rate, staircase=True)
     # Input accepts arbitrary length sequence as input variable
-    x = tf.placeholder(dtype=tf.float32, shape=[None, INPUT_SEQUENCE_LENGTH, FEATURES], name='X')
+    # Input is of shape [BATCH_COUNT, SEQUENCE_LENGTH, FEATURES]
+    x = tf.placeholder(dtype=tf.float32, shape=[None, INPUT_SEQUENCE_LENGTH], name='X')
     # x = tf.placeholder(dtype=tf.float32, shape=[None, None], name='x')
-    # Input is of size [BATCH_COUNT, SEQUENCE_LENGTH, N_CLASSES]
-    # inputs = tf.expand_dims(input=x, axis=2)
-    variable_summaries(x)
+    inputs = tf.expand_dims(input=x, axis=2)
+    variable_summaries(inputs)
+
 # Define RNN bit
 with tf.name_scope('RNN'):
     lstm_1 = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_1_N)
-    lstm_2 = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_1_N * 2)
-    lstm_2 = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_1_N * 4)
-    lstm_2 = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_1_N * 8)
+    lstm_2 = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_1_N // 2)
     cells = tf.nn.rnn_cell.MultiRNNCell(cells=[lstm_1, lstm_2])
-    rnn_output, _ = tf.nn.dynamic_rnn(cell=cells, inputs=x, dtype=tf.float32)
-    # rnn_dropout = tf.nn.dropout(x=rnn_output, keep_prob=0.5)
+    rnn_output, _ = tf.nn.dynamic_rnn(cell=cells, inputs=inputs, dtype=tf.float32)
 
-# Standard Dense bit
+# Regularisation
+with tf.name_scope('L2_REG'):
+    l2_regulariser = tf.contrib.layers.l2_regularizer(scale=L2_REG_BETA)
+    he_init = tf.contrib.layers.variance_scaling_initializer()  # He initialization
+
+# Define Dense bit
 with tf.name_scope('DNN'):
     output = tf.transpose(a=rnn_output, perm=[1, 0, 2])
-    hidden_fc = tf.layers.dense(inputs=output[-1], units=HIDDEN_FC_N, activation=tf.nn.relu)
-    # fc_dropout = tf.nn.dropout(x=hidden_fc, keep_prob=0.1)
+    last_rnn = output[-1]
+    # last = tf.gather(output, int(output.get_shape()[0]) - 1)
+    fc_1 = tf.layers.dense(inputs=last_rnn, units=FC_1_N, activation=tf.nn.relu,
+                           kernel_initializer=he_init, kernel_regularizer=l2_regulariser)
+    variable_summaries(fc_1)
 
 with tf.name_scope('LR'):
-    y_pred = tf.layers.dense(inputs=hidden_fc, units=OUTPUT_SEQUENCE_LENGTH)
+    y_pred = tf.layers.dense(inputs=fc_1, units=OUTPUT_SEQUENCE_LENGTH)
     variable_summaries(y_pred)
+
 # ======================================================================================================================
 # Define loss
 with tf.name_scope('LOSS'):
     y_true = tf.placeholder(dtype=tf.float32, shape=[None, OUTPUT_SEQUENCE_LENGTH], name='TRUTH')
     # y_true = tf.placeholder(dtype=tf.float32, shape=[None, None], name='truth')
-    loss = tf.reduce_mean(input_tensor=tf.square(x=(y_pred - y_true)))
-    train_step = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE).minimize(loss=loss)
+    reconstruction_loss = tf.reduce_mean(input_tensor=tf.square(x=(y_pred - y_true)))
+    reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+    loss = tf.add_n([reconstruction_loss] + reg_losses)
+    train_step = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss=loss, global_step=global_step)
     variable_summaries(loss)
+
 # ======================================================================================================================
 # Train model
 sess = tf.InteractiveSession()
 sess.run(fetches=tf.global_variables_initializer())
 
-log_file = "graphs/lstm_simple/multi_lstm"
+log_file = "graphs/lstm"
 merged = tf.summary.merge_all()
 writer = tf.summary.FileWriter(log_file, sess.graph)
 
-input_size = len(y_input_train_mod)
+input_size = len(y_input_train)
 for s in range(N_ITERATIONS):
     ind_n = np.random.choice(a=input_size, size=BATCH_SIZE, replace=False)
-    x_batch = y_input_train_mod[ind_n]
+    x_batch = y_input_train[ind_n]
     y_batch = y_output_train[ind_n]
 
     feed_dict = {x: x_batch, y_true: y_batch}
     sess.run(fetches=train_step, feed_dict=feed_dict)
 
     if s % 1000 == 0:
-        train_loss = loss.eval(feed_dict={x: y_input_train_mod, y_true: y_output_train})
-        val_loss = loss.eval(feed_dict={x: y_input_test_mod, y_true: y_output_test})
+        train_loss = loss.eval(feed_dict={x: y_input_train, y_true: y_output_train})
+        val_loss = loss.eval(feed_dict={x: y_input_test, y_true: y_output_test})
 
         msg = "step: {e}/{steps}, loss: {tr_e}, val_loss: {ts_e} ".format(e=s, steps=N_ITERATIONS,
                                                                           tr_e=train_loss, ts_e=val_loss)
         print(msg)
 
-        summary = merged.eval(feed_dict={x: y_input_test_mod, y_true: y_output_test})
+        summary = merged.eval(feed_dict={x: y_input_test, y_true: y_output_test})
         writer.add_summary(summary, s)
 
 # ======================================================================================================================
-y_predictions_train = y_pred.eval(feed_dict={x: y_input_train_mod})
-y_predictions_test = y_pred.eval(feed_dict={x: y_input_test_mod})
+y_predictions_train = y_pred.eval(feed_dict={x: y_input_train})
+y_predictions_test = y_pred.eval(feed_dict={x: y_input_test})
 # ======================================================================================================================
 marker_size = 3
-plt.plot(y_input_train[:,:,1], y_input_train[:,:,0],
-         color='black',
-         label='train-input')
+plt.scatter(x_input_train.flatten(), y_input_train.flatten(),
+            color='black',
+            label='train-input',
+            s=marker_size)
 
-plt.plot(x_output_train, y_output_train,
-         color='red',
-         label='train-output')
-
-plt.plot(x_output_train, y_predictions_train,
-         color='blue',
+plt.plot(x_output_train.flatten(), y_predictions_train.flatten(),
+         color='orange',
          label='train-prediction')
 
-plt.plot(y_input_test[:,:,1], y_input_test[:,:,0],
-         color='cyan',
-         label='test-input')
+plt.scatter(x_input_test.flatten(), y_input_test.flatten(),
+            color='blue',
+            label='test-input',
+            s=marker_size)
 
-
-plt.plot(x_output_test, y_output_test,
-         color='green',
-         label='test-output')
-
-plt.plot(x_output_test, y_predictions_test,
-         color='orange',
+plt.plot(x_output_test.flatten(), y_predictions_test.flatten(),
+         color='red',
          label='test-prediction')
 
 plt.xlabel("x")

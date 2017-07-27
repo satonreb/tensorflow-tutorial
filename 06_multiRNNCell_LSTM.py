@@ -21,14 +21,14 @@ def data_split(data, input_seq_len, output_seq_len, output_seq_steps_ahead):
     return data_input, data_output
 
 
-POINT_NUMBER = 6000
+POINT_NUMBER = 500
 INPUT_SEQUENCE_LENGTH = 10
-OUTPUT_SEQUENCE_LENGTH = 3
-OUTPUT_SEQUENCE_STEPS_AHEAD = 1
+OUTPUT_SEQUENCE_LENGTH = 1
+OUTPUT_SEQUENCE_STEPS_AHEAD = 20
 TRAIN_SPLIT = 2
 BATCH_SIZE = 70
 N_ITERATIONS = 10000
-LSTM_NEURONS = 50
+LSTM_NEURONS = 25
 LEARNING_RATE = 1e-3
 
 COEF = 10 * np.pi
@@ -67,15 +67,9 @@ with tf.name_scope('inputs'):
 
 # Define Encoder LSTM (RNN) bit
 with tf.name_scope('encoder'):
-    encoder_cell = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_NEURONS)
-    # encoder_lstm_output, _ = tf.nn.dynamic_rnn(cell=encoder_cell, inputs=inputs, dtype=tf.float32)
-
-# Define Decoder LSTM (RNN) bit
-with tf.name_scope('decoder'):
-    decoder_cell = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_NEURONS)
-
-    cells = tf.nn.rnn_cell.MultiRNNCell(cells=[encoder_cell, decoder_cell])
-
+    cell_1 = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_NEURONS * 2)
+    cell_2 = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_NEURONS)
+    cells = tf.nn.rnn_cell.MultiRNNCell(cells=[cell_1, cell_2])
     rnn_output, _ = tf.nn.dynamic_rnn(cell=cells, inputs=inputs, dtype=tf.float32)
 
 # Standard Dense bit
