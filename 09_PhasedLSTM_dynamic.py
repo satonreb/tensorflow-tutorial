@@ -1,173 +1,121 @@
-import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
-from sklearn.model_selection import TimeSeriesSplit
 
-# ======================================================================================================================
-# Resets the graph
-tf.reset_default_graph()
+# this works and learns somtnihg but I am not sure if everythig is correct.
+# Need to check output, input and apply to my own data. 
 
 
-# ======================================================================================================================
+# Unit test for Phased LSTM
+flags = tf.flags
+flags.DEFINE_integer('batch_size', 32, 'batch size')  # 32
+flags.DEFINE_float('max_length', 125, 'max length of sin waves')
+flags.DEFINE_float('min_length', 50, 'min length of sine waves')
+flags.DEFINE_float('max_f_off', 100, 'max frequency for the off set')
+flags.DEFINE_float('min_f_off', 1, 'min frequency for the off set')
+flags.DEFINE_float('max_f_on', 5, 'max frequency for the on set')
+flags.DEFINE_float('min_f_on', 6, 'min frequency for the on set')
+FLAGS = flags.FLAGS
 
-def variable_summaries(var):
-    """Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
-    with tf.name_scope('summaries'):
-        mean = tf.reduce_mean(var)
-        tf.summary.scalar('mean', mean)
-        with tf.name_scope('stddev'):
-            stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
-        tf.summary.scalar('stddev', stddev)
-        tf.summary.scalar('max', tf.reduce_max(var))
-        tf.summary.scalar('min', tf.reduce_min(var))
-        tf.summary.histogram('histogram', var)
-
-
-# ======================================================================================================================
-# Data generation
-
-def data_split(data, input_seq_len, output_seq_len, output_seq_steps_ahead):
-    steps_ahead = output_seq_steps_ahead - 1
-    seq_number = len(data) + 1 - steps_ahead - input_seq_len - output_seq_len
-    data_input = np.array([data[index: index + input_seq_len] for index in range(seq_number)])
-    data_output = np.array([
-        data[index + input_seq_len + steps_ahead: index + input_seq_len + steps_ahead + output_seq_len]
-        for index in range(seq_number)])
-    return data_input, data_output
+# Net Params
+n_input = 1
+n_out = 2
+n_hidden = 16  # hidden units in the recurrent layer
+n_epochs = 30
+b_per_epoch = 80
 
 
-INPUT_SEQUENCE_LENGTH = 3
-OUTPUT_SEQUENCE_LENGTH = 1
-OUTPUT_SEQUENCE_STEPS_AHEAD = 1
-N_SPLITS = 2
-BATCH_SIZE = 70
-N_ITERATIONS = 5000
-LSTM_1_N = 5
-FC_1_N = 10
-INITIAL_LEARNING_RATE = 1e-2
-L2_REG_BETA = 0.03
+def gen_async_sin(batch_size=32, on_target_T=(5, 6), off_target_T=(1, 100), max_len=125, min_len=85):
+    half_batch = int(batch_size / 2)
+    full_length = off_target_T[1] - on_target_T[1] + on_target_T[0] - off_target_T[0]
+    # generate random periods
+    posTs = np.random.uniform(on_target_T[0], on_target_T[1], half_batch)
+    size_low = np.floor((on_target_T[0] - off_target_T[0]) * half_batch / full_length).astype('int32')
+    size_high = np.ceil((off_target_T[1] - on_target_T[1]) * half_batch / full_length).astype('int32')
+    low_vec = np.random.uniform(off_target_T[0], on_target_T[0], size_low)
+    high_vec = np.random.uniform(on_target_T[1], off_target_T[1], size_high)
+    negTs = np.hstack([low_vec,
+                       high_vec])
+    # generate random lengths
+    lens = np.random.uniform(min_len, max_len, batch_size)
 
-X = np.linspace(start=-2 * np.pi, stop=2 * np.pi, num=500)
-Y = np.sin(X)
+    # generate random number of samples
+    samples = np.random.uniform(min_len, max_len, batch_size).astype('int32')
 
-# plt.plot(X, Y)
+    start_times = np.array([np.random.uniform(0, max_len - duration) for duration in lens])
+    x = np.zeros((batch_size, max_len, 1))
+    y = np.zeros((batch_size, 2))
+    t = np.zeros((batch_size, max_len, 1))
+    for i, s, l, n in zip(range(batch_size), start_times, lens, samples):
+        time_points = np.reshape(np.sort(np.random.uniform(s, s + l, n)), [-1, 1])
 
-x_input, x_output = data_split(data=X,
-                               input_seq_len=INPUT_SEQUENCE_LENGTH,
-                               output_seq_len=OUTPUT_SEQUENCE_LENGTH,
-                               output_seq_steps_ahead=OUTPUT_SEQUENCE_STEPS_AHEAD)
+        if i < half_batch:  # positive
+            _tmp_x = np.squeeze(np.sin(time_points * 2 * np.pi / posTs[i]))
+            x[i, :len(_tmp_x), 0] = _tmp_x
+            t[i, :len(_tmp_x), 0] = np.squeeze(time_points)
+            y[i, 0] = 1.
+        else:
+            _tmp_x = np.squeeze(np.sin(time_points * 2 * np.pi / negTs[i - half_batch]))
+            x[i, :len(_tmp_x), 0] = _tmp_x
+            t[i, :len(_tmp_x), 0] = np.squeeze(time_points)
+            y[i, 1] = 1.
 
-y_input, y_output = data_split(data=Y,
-                               input_seq_len=INPUT_SEQUENCE_LENGTH,
-                               output_seq_len=OUTPUT_SEQUENCE_LENGTH,
-                               output_seq_steps_ahead=OUTPUT_SEQUENCE_STEPS_AHEAD)
-
-data_split = TimeSeriesSplit(n_splits=N_SPLITS)
-for train_index, test_index in data_split.split(y_input):
-    x_input_train, x_input_test = x_input[train_index], x_input[test_index]
-    y_input_train, y_input_test = y_input[train_index], y_input[test_index]
-    x_output_train, x_output_test = x_output[train_index], x_output[test_index]
-    y_output_train, y_output_test = y_output[train_index], y_output[test_index]
+    return x, t, y, samples, posTs, negTs
 
 
-# ======================================================================================================================
+# inputs
+x = tf.placeholder(tf.float32, shape=(None, None, 1))
+t = tf.placeholder(tf.float32, shape=(None, None, 1))
 
-# ======================================================================================================================
+# # length of the samples -> for dynamic_rnn
+lens = tf.placeholder(tf.int32, [None])
 
-# Define model
-# with tf.name_scope('SETUP'):
-# Input accepts arbitrary length sequence as input variable
-# x = tf.placeholder(dtype=tf.float32, shape=[None, INPUT_SEQUENCE_LENGTH], name='X')
-# x = tf.placeholder(dtype=tf.float32, shape=[None, None], name='x')
-# Input is of size [BATCH_COUNT, SEQUENCE_LENGTH, N_CLASSES]
-# inputs = tf.expand_dims(input=x, axis=2)
-# variable_summaries(inputs)
+# labels
+y = tf.placeholder(tf.float32, [None, 2])
 
-# Define RNN bit
-# with tf.name_scope('VANILLA_LSTM'):
-#     lstm_1 = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_1_N)
-#     lstm_2 = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_1_N // 2)
-#     cells = tf.nn.rnn_cell.MultiRNNCell(cells=[lstm_1, lstm_2])
-#     rnn_output, _ = tf.nn.dynamic_rnn(cell=cells, inputs=inputs, dtype=tf.float32)
+# Let's define the training and testing operations
+cell = tf.contrib.rnn.PhasedLSTMCell(num_units=n_hidden, use_peepholes=True)
+# outputs, states = tf.nn.dynamic_rnn(cell=cell, inputs=(x, t), dtype=tf.float32, sequence_length=lens)
+outputs, states = tf.nn.dynamic_rnn(cell=cell, inputs=(x, t), dtype=tf.float32)
 
-with tf.name_scope('PHASED_LSTM'):
-    x = tf.placeholder(dtype=tf.float32, shape=[None, INPUT_SEQUENCE_LENGTH, 2], name='X')
-    lstm_1 = tf.contrib.rnn.PhasedLSTMCell(num_units=LSTM_1_N)
-    output, _ = tf.nn.dynamic_rnn(cell=lstm_1, inputs=x, dtype=tf.float32)
-    rnn_output = tf.squeeze(tf.slice(output, begin=[0, tf.shape(output)[1] - 1, 0], size=[-1, -1, -1]))
+t_output = tf.transpose(a=outputs, perm=[1, 0, 2])
+predictions = tf.layers.dense(inputs=t_output[-1], units=n_out)
 
-# Define Dense bit
-with tf.name_scope('LR'):
-    output = tf.transpose(a=rnn_output, perm=[1, 0, 2])
-    last = output[-1]
-    # last = tf.gather(output, int(output.get_shape()[0]) - 1)
+cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=predictions, labels=y))
+optimizer = tf.train.AdamOptimizer().minimize(cross_entropy)
 
-    fc_1 = tf.layers.dense(inputs=last, units=FC_1_N, activation=tf.nn.relu)
-    y_pred = tf.layers.dense(inputs=fc_1, units=OUTPUT_SEQUENCE_LENGTH)
-    variable_summaries(y_pred)
+# evaluation
+correct_pred = tf.equal(tf.argmax(predictions, 1), tf.argmax(y, 1))
+accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 
-# ======================================================================================================================
-# Define loss
-with tf.name_scope('LOSS'):
-    y_true = tf.placeholder(dtype=tf.float32, shape=[None, OUTPUT_SEQUENCE_LENGTH], name='TRUTH')
-    loss = tf.reduce_mean(tf.square(tf.sub(y_pred, y_true)))
-    train_step = tf.train.AdamOptimizer(learning_rate=INITIAL_LEARNING_RATE).minimize(loss=loss)
-    variable_summaries(loss)
-
-# ======================================================================================================================
-# Train model
+# run the model
 sess = tf.InteractiveSession()
 sess.run(fetches=tf.global_variables_initializer())
 
-log_file = "graphs/lstm"
-merged = tf.summary.merge_all()
-writer = tf.summary.FileWriter(log_file, sess.graph)
+# training loop
+for step in range(n_epochs):
+    train_cost = 0
+    train_acc = 0
+    for i in range(b_per_epoch):
+        batch_xs, batch_ts, batch_ys, _, _, _ = gen_async_sin(FLAGS.batch_size, [FLAGS.min_f_on, FLAGS.max_f_on],
+                                                                 [FLAGS.min_f_off, FLAGS.max_f_off],
+                                                                 FLAGS.max_length,
+                                                                 FLAGS.min_length)
 
-input_size = len(y_input_train)
-for s in range(N_ITERATIONS):
-    ind_n = np.random.choice(a=input_size, size=BATCH_SIZE, replace=False)
-    x_batch = y_input_train[ind_n]
-    y_batch = y_output_train[ind_n]
+        res = sess.run([optimizer, cross_entropy, accuracy],
+                       feed_dict={x: batch_xs,
+                                  t: batch_ts,
+                                  y: batch_ys})
+        train_cost += res[1] / b_per_epoch
+        train_acc += res[2] / b_per_epoch
 
-    feed_dict = {x: x_batch, y_true: y_batch}
-    sess.run(fetches=train_step, feed_dict=feed_dict)
+        # test accuracy
+        test_xs, test_ts, test_ys, _, _, _ = gen_async_sin(FLAGS.batch_size * 10, [FLAGS.min_f_on, FLAGS.max_f_on],
+                                                                [FLAGS.min_f_off, FLAGS.max_f_off],
+                                                                FLAGS.max_length, FLAGS.min_length)
 
-    if s % 1000 == 0:
-        train_loss = loss.eval(feed_dict={x: y_input_train, y_true: y_output_train})
-        val_loss = loss.eval(feed_dict={x: y_input_test, y_true: y_output_test})
+        loss_test = cross_entropy.eval(feed_dict={x: test_xs, t: test_ts, y: test_ys})
+        acc_test = accuracy.eval(feed_dict={x: test_xs, t: test_ts, y: test_ys})
 
-        msg = "step: {e}/{steps}, loss: {tr_e}, val_loss: {ts_e} ".format(e=s, steps=N_ITERATIONS,
-                                                                          tr_e=train_loss, ts_e=val_loss)
+        msg = "step: {e}/{steps}, train loss: {tr_l}, train accuracy: {tr_a} test loss: {te_l}, test accuracy: {te_a}".format(
+            e=step, steps=n_epochs, tr_l=train_cost, tr_a=train_acc, te_l=loss_test, te_a=acc_test)
         print(msg)
-
-        summary = merged.eval(feed_dict={x: y_input_test, y_true: y_output_test})
-        writer.add_summary(summary, s)
-
-# ======================================================================================================================
-y_predictions_train = y_pred.eval(feed_dict={x: y_input_train})
-y_predictions_test = y_pred.eval(feed_dict={x: y_input_test})
-# ======================================================================================================================
-marker_size = 3
-plt.scatter(x_input_train.flatten(), y_input_train.flatten(),
-            color='black',
-            label='train-input',
-            s=marker_size)
-
-plt.plot(x_output_train.flatten(), y_predictions_train.flatten(),
-         color='orange',
-         label='train-prediction')
-
-plt.scatter(x_input_test.flatten(), y_input_test.flatten(),
-            color='blue',
-            label='test-input',
-            s=marker_size)
-
-plt.plot(x_output_test.flatten(), y_predictions_test.flatten(),
-         color='red',
-         label='test-prediction')
-
-plt.xlabel("x")
-plt.ylabel("y")
-plt.grid()
-plt.legend()
-# ======================================================================================================================
