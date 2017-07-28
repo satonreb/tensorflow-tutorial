@@ -50,28 +50,15 @@ N_SPLITS = 4
 BATCH_SIZE = 70
 N_ITERATIONS = 10000
 LSTM_1_N = 16
-INITIAL_LEARNING_RATE = 1e-3
-LEARNING_RATE_DECAY_STEPS = 1000
-LEARNING_RATE_DECAY_RATE = 0.96
-FC_1_N = 10
-L2_REG_BETA = 0.03
+LEARNING_RATE = 1e-3
 log_file = "graphs/lstm"
 # ======================================================================================================================
-# # Real Wold Data
-# DATA_PATH = "data/euro-foreign-exchange-reference-.csv"
-# df = pd.read_csv(DATA_PATH)
-# df = df[:-3]
-# df['Date'] = df['Date'].map(lambda st: pd.datetime.strptime(st, '%Y-%m-%d'))
-# X = np.array(df['Date'])
-# Y = np.array(df['Euro foreign exchange reference rates'])
-# ======================================================================================================================
 # Synthetic Data
-X = np.linspace(start=-5 * np.pi, stop=10 * np.pi, num=500)
-Y = np.sin(X) / 2 - np.sin(-X * 5) + X
-X = X / (10 * np.pi)
-# plt.plot(X, Y)
-# ======================================================================================================================
+Y = np.random.uniform(-10.5, 10.5, 5000)
+noise = np.random.normal(scale=1, size=Y.shape)
+X = np.sin(0.75 * Y) * 7.0 + Y * 0.5 + noise * 1.0
 
+# plt.plot(X, Y)
 x_input, x_output = prep_data(array=X, input_seq_len=INPUT_SEQUENCE_LENGTH, output_seq_len=OUTPUT_SEQUENCE_LENGTH,
                               output_seq_steps_ahead=OUTPUT_SEQUENCE_STEPS_AHEAD, expand_dim=False, expand_dim_axis=2)
 y_input, y_output = prep_data(array=Y, input_seq_len=INPUT_SEQUENCE_LENGTH, output_seq_len=OUTPUT_SEQUENCE_LENGTH,
@@ -93,13 +80,7 @@ for train_index, val_index in TimeSeriesSplit(n_splits=N_SPLITS).split(y_input_t
 
 # ======================================================================================================================
 # Define model
-# **********************************************************************************************************************
-# These bits have changed
 with tf.name_scope('SETUP'):
-    global_step = tf.Variable(0, trainable=False)
-    learning_rate = tf.train.exponential_decay(learning_rate=INITIAL_LEARNING_RATE, global_step=global_step,
-                                               decay_steps=LEARNING_RATE_DECAY_STEPS,
-                                               decay_rate=LEARNING_RATE_DECAY_RATE, staircase=True)
     # Input is of shape [BATCH_COUNT, SEQUENCE_LENGTH, FEATURES]
     FEATURES = y_input_train.shape[2]
     x = tf.placeholder(dtype=tf.float32, shape=[None, INPUT_SEQUENCE_LENGTH, FEATURES], name='X')
@@ -107,49 +88,37 @@ with tf.name_scope('SETUP'):
     # x = tf.placeholder(dtype=tf.float32, shape=[None, None, FEATURES], name='x')
     variable_summaries(x)
 
+# **********************************************************************************************************************
+# These bits have changed
 # Define RNN bit
 with tf.name_scope('RNN'):
     lstm_1 = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_1_N)
     lstm_2 = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_1_N // 2)
-    cells = tf.nn.rnn_cell.MultiRNNCell(cells=[lstm_1, lstm_2])
+    lstm_3 = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_1_N // 4)
+    lstm_4 = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_1_N // 8)
+    cells = tf.nn.rnn_cell.MultiRNNCell(cells=[lstm_1, lstm_2, lstm_3, lstm_4])
     rnn_output, _ = tf.nn.dynamic_rnn(cell=cells, inputs=x, dtype=tf.float32)
-
-# Regularisation
-with tf.name_scope('L2_REG'):
-    l2_regulariser = tf.contrib.layers.l2_regularizer(scale=L2_REG_BETA)
-    he_init = tf.contrib.layers.variance_scaling_initializer()  # He initialization
-
-# Define Dense bit
-with tf.name_scope('DNN'):
-    output = tf.transpose(a=rnn_output, perm=[1, 0, 2])
-    last_rnn = output[-1]
-    # last = tf.gather(output, int(output.get_shape()[0]) - 1)
-    fc_1 = tf.layers.dense(inputs=last_rnn, units=FC_1_N, activation=tf.nn.relu,
-                           kernel_initializer=he_init, kernel_regularizer=l2_regulariser)
-    variable_summaries(fc_1)
+# **********************************************************************************************************************
 
 with tf.name_scope('LR'):
-    y_pred = tf.layers.dense(inputs=fc_1, units=OUTPUT_SEQUENCE_LENGTH)
+    output = tf.transpose(a=rnn_output, perm=[1, 0, 2])
+    y_pred = tf.layers.dense(inputs=output[-1], units=OUTPUT_SEQUENCE_LENGTH)
     prediction = tf.expand_dims(input=y_pred, axis=2, name='PREDICTION')
     variable_summaries(y_pred)
-# **********************************************************************************************************************
 
 # ======================================================================================================================
 # Define loss
 with tf.name_scope('LOSS'):
     y_true = tf.placeholder(dtype=tf.float32, shape=[None, OUTPUT_SEQUENCE_LENGTH, 1], name='TRUTH')
     # y_true = tf.placeholder(dtype=tf.float32, shape=[None, None], name='truth')
-    reconstruction_loss = tf.reduce_mean(input_tensor=tf.square(x=tf.subtract(x=y_pred, y=y_true)))
-    reg_losses = tf.get_collection(key=tf.GraphKeys.REGULARIZATION_LOSSES)
-    loss = tf.add_n([reconstruction_loss] + reg_losses)
-    train_step = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss=loss, global_step=global_step)
+    loss = tf.reduce_mean(input_tensor=tf.square(x=tf.subtract(x=y_pred, y=y_true)))
+    train_step = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE).minimize(loss=loss)
     variable_summaries(loss)
 
 # ======================================================================================================================
 # Train model
 sess = tf.InteractiveSession()
 sess.run(fetches=tf.global_variables_initializer())
-
 
 merged = tf.summary.merge_all()
 writer = tf.summary.FileWriter(log_file, sess.graph)

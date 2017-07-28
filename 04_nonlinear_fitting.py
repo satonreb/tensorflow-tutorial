@@ -3,73 +3,133 @@ import numpy as np
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
 
-# CUSTOMIZABLE: Collect/Prepare data
-X_MIN = -2 * np.pi
-X_MAX = 2 * np.pi
-N = 100
-TEST_SIZE = 0.5
-EPOCHS = 10000
+# ======================================================================================================================
+# Resets the graph
+tf.reset_default_graph()
+# ======================================================================================================================
+# Hyperparameters
+TEST_SIZE = 0.33
+FC_1_N = 10
+FC_2_N = 20
 LEARNING_RATE = 1e-2
-N_NEURONS = 50
+BATCH_SIZE = 120
+N_ITERATIONS = 10000
+# ======================================================================================================================
+# Synthetic Data
+X = np.linspace(start=-5, stop=10, num=2000)
+noise = np.random.normal(scale=1, size=X.size)
+Y = X ** 2 * (np.sin(X)) + noise
 
-# Create data
-X = np.random.uniform(low=X_MIN, high=X_MAX, size=N)
-noise = np.random.normal(scale=0.1, size=X.size)
-y = X ** 2 * (np.sin(X)) + noise
+# plt.plot(X, Y)
+# ======================================================================================================================
+# Split data
+data = list(map(lambda a: np.expand_dims(a, axis=1), [X, Y]))
+x_train_val, x_test, y_train_val, y_test = train_test_split(data[0], data[1], test_size=TEST_SIZE)
+x_train, x_val, y_train, y_val = train_test_split(x_train_val, y_train_val, test_size=TEST_SIZE)
 
-# Split the data
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=TEST_SIZE)
-X_train = X_train.reshape(X_train.size, 1)
-X_test = X_test.reshape(X_test.size, 1)
-y_train = y_train.reshape(y_train.size, 1)
-y_test = y_test.reshape(y_test.size, 1)
-
+print('Shape of Training dataset is: {train}, Validation: {val}, Test: {test}'.format(train=x_train.shape,
+                                                                                      val=x_val.shape,
+                                                                                      test=x_test.shape))
+# ======================================================================================================================
 # Define model
-input_layer_size = 1
-output_layer_size = 1
-x = tf.placeholder(tf.float32, shape=[None, input_layer_size])
-y_true = tf.placeholder(tf.float32, shape=[None, output_layer_size])
 
-# Linear
-# W = tf.Variable(initial_value=tf.zeros([input_layer_size, output_layer_size]))
-# b = tf.Variable(initial_value=tf.zeros([output_layer_size]))
-# y_pred = tf.multiply(x, W) + b
+# Input is of shape [BATCH_COUNT, FEATURES]
+FEATURES = x_train.shape[1]
+x = tf.placeholder(tf.float32, shape=[None, FEATURES], name='X')
 
-# Dense NN
-# First layer
-w1 = tf.Variable(initial_value=tf.truncated_normal(shape=[input_layer_size, N_NEURONS], stddev=0.1))
-b1 = tf.Variable(initial_value=tf.constant(value=0.1, shape=[N_NEURONS]))
-h1 = tf.nn.relu(tf.multiply(x=x, y=w1) + b1)
-# Output layer
-w2 = tf.Variable(initial_value=tf.truncated_normal(shape=[N_NEURONS, output_layer_size], stddev=0.1))
-b2 = tf.Variable(initial_value=tf.constant(value=0.1, shape=[output_layer_size]))
-y_pred = tf.matmul(a=h1, b=w2) + b2
+# Define Dense bit
+fc_1 = tf.layers.dense(inputs=x, units=FC_1_N, activation=tf.nn.relu)
+fc_2 = tf.layers.dense(inputs=fc_1, units=FC_2_N, activation=tf.nn.relu)
+prediction = tf.layers.dense(inputs=fc_2, units=FEATURES, name='PREDICTION')
 
 # Define loss
-cost = tf.reduce_mean(input_tensor=tf.square(x=(y_pred - y_true)))
-train_step = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE).minimize(loss=cost)
+y_true = tf.placeholder(dtype=tf.float32, shape=[None, FEATURES], name='TRUTH')
+loss = tf.reduce_mean(input_tensor=tf.square(x=tf.subtract(x=prediction, y=y_true)))
+train_step = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE).minimize(loss=loss)
 
-# Start the session
+# ======================================================================================================================
+# Train model
 sess = tf.InteractiveSession()
 sess.run(fetches=tf.global_variables_initializer())
 
-# Train model
-for i in range(EPOCHS):
-    feed = {x: X_train, y_true: y_train}
-    result = sess.run(fetches=train_step, feed_dict=feed)
-    if i % 1000 == 0:
-        train_error = cost.eval(feed_dict={x: X_train, y_true: y_train})
-        test_error = cost.eval(feed_dict={x: X_test, y_true: y_test})
-        print("epoch: {i}, train error: {train_error}, test error: {test_error}".format(
-                i=i,
-                train_error=train_error,
-                test_error=test_error))
+input_size = len(y_train)
+for s in range(N_ITERATIONS):
+    ind_n = np.random.choice(a=input_size, size=BATCH_SIZE, replace=False)
+    x_batch = x_train[ind_n]
+    y_batch = y_train[ind_n]
 
-# Plot results
-plt.scatter(X_test, y_test,  color='b')
-xx = np.sort(X_test, axis=0)
-yy = y_pred.eval(feed_dict={x: xx})
-plt.plot(xx, yy, color='r', linewidth=1)
-plt.xlabel("X")
+    feed_dict = {x: x_batch, y_true: y_batch}
+    sess.run(fetches=train_step, feed_dict=feed_dict)
+
+    if s % 1000 == 0:
+        train_loss = loss.eval(feed_dict={x: x_train, y_true: y_train})
+        val_loss = loss.eval(feed_dict={x: x_val, y_true: y_val})
+
+        msg = "step: {e}/{steps}, loss: {tr_e}, val_loss: {ts_e} ".format(e=s, steps=N_ITERATIONS,
+                                                                          tr_e=train_loss, ts_e=val_loss)
+        print(msg)
+
+# ======================================================================================================================
+y_predictions_train = prediction.eval(feed_dict={x: x_train})
+y_predictions_val = prediction.eval(feed_dict={x: x_val})
+
+
+# ======================================================================================================================
+def flatten_sort(sort_by, b):
+    if len(sort_by.shape) > 0:
+        sort_by = sort_by.flatten()
+    ind = np.argsort(sort_by)
+    return np.array(list(sort_by.flatten()[i] for i in ind)), np.array(list(b.flatten()[i] for i in ind))
+
+
+marker_size = 3
+plt.figure()
+
+plt.scatter(x_train, y_train,
+            color='red',
+            label='train-true',
+            s=marker_size)
+
+input_train, output_train = flatten_sort(sort_by=x_train, b=y_predictions_train)
+plt.plot(input_train, output_train,
+         color='orange',
+         label='train-predictions',
+         linewidth=4)
+
+plt.scatter(x_val, y_val,
+            color='blue',
+            label='val-true',
+            s=marker_size)
+
+input_val, output_val = flatten_sort(sort_by=x_val, b=y_predictions_val)
+plt.plot(input_val, output_val,
+         color='black',
+         label='val-predictions')
+
+plt.xlabel("x")
 plt.ylabel("y")
+plt.grid()
+plt.legend()
+# ======================================================================================================================
+# Test
+test_loss = loss.eval(feed_dict={x: x_test, y_true: y_test})
+print("Test loss is: {loss}".format(loss=test_loss))
+y_predictions_test = prediction.eval(feed_dict={x: x_test})
+plt.figure()
+
+plt.scatter(x_test, y_test,
+            color='black',
+            label='test-true',
+            s=marker_size)
+
+input_test, output_test = flatten_sort(sort_by=x_test, b=y_predictions_test)
+plt.plot(input_test, output_test,
+         color='orange',
+         label='test-predictions')
+
+plt.xlabel("x")
+plt.ylabel("y")
+plt.grid()
+plt.legend()
 plt.show()
+# ======================================================================================================================

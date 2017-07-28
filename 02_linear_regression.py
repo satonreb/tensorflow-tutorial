@@ -1,116 +1,133 @@
-import tensorflow as tf
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import tensorflow as tf
+from sklearn.model_selection import train_test_split
 
-# Script shows how to use TensorFlow for linear regression for multiple features and one class
-# and use batches for the training. In addition, create and save computational graphs and stuff.
+# ======================================================================================================================
+# Resets the graph
+tf.reset_default_graph()
+# ======================================================================================================================
+# Hyperparameters
+TEST_SIZE = 0.33
+LEARNING_RATE = 1e-2
+BATCH_SIZE = 120
+N_ITERATIONS = 10000
+# ======================================================================================================================
+# Synthetic Data
+X = np.linspace(start=-5, stop=10, num=2000)
+noise = np.random.normal(scale=1, size=X.size)
+Y = 2.0 * X + 3.0 + noise
 
-# CUSTOMIZABLE: Collect/Prepare data
-datapoint_size = 1000
-batch_size = 1000
-steps = 10
-actual_b = 2
-feature_number = 5
-learning_rate = 0.001
-log_file = "graphs"
+# plt.plot(X, Y)
+# ======================================================================================================================
+# Split data
+data = list(map(lambda a: np.expand_dims(a, axis=1), [X, Y]))
+x_train_val, x_test, y_train_val, y_test = train_test_split(data[0], data[1], test_size=TEST_SIZE)
+x_train, x_val, y_train, y_val = train_test_split(x_train_val, y_train_val, test_size=TEST_SIZE)
 
-# Fake data
-all_xs, all_ys = [], []
-actual_W = np.random.randint(low=-10, high=10, size=feature_number)
+print('Shape of Training dataset is: {train}, Validation: {val}, Test: {test}'.format(train=x_train.shape,
+                                                                                      val=x_val.shape,
+                                                                                      test=x_test.shape))
+# ======================================================================================================================
+# Define model
 
-for i in range(datapoint_size):
-    # Create fake data for y = actual_W1 * x1 + actual_W2 * x2  + ... + actual_WN * xN + actual_b
-    a = i % 10
-    xx = np.random.randint(low=-a-10, high=a+10, size=feature_number)
-    yy = np.matmul(a=xx, b=actual_W) + actual_b
-    all_xs.append(xx)
-    all_ys.append(yy)
-all_xs = np.array(all_xs)
-all_ys = np.transpose([all_ys])
+# Input is of shape [BATCH_COUNT, FEATURES]
+FEATURES = x_train.shape[1]
+x = tf.placeholder(tf.float32, shape=[None, FEATURES], name='X')
 
-idx = 600
-all_xs_train = all_xs[:idx, :]
-all_ys_train = all_ys[:idx]
-all_xs_test = all_xs[idx:, :]
-all_ys_test = all_ys[idx:]
+# Define Dense bit
+with tf.variable_scope('LR'):
+    prediction = tf.layers.dense(inputs=x, units=FEATURES, name='PREDICTION')
 
-# Model construction
-# placeholder for input variable
-x = tf.placeholder(dtype=tf.float32, shape=[None, feature_number], name='x')
+# Define loss
+y_true = tf.placeholder(dtype=tf.float32, shape=[None, FEATURES], name='TRUTH')
+loss = tf.reduce_mean(input_tensor=tf.square(x=tf.subtract(x=prediction, y=y_true)))
+train_step = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE).minimize(loss=loss)
 
-# # definition of weight matrix and bias vector
-# W = tf.Variable(initial_value=tf.zeros([feature_number, 1]), name='W')
-# b = tf.Variable(initial_value=tf.zeros([1]), name='b')
-#
-# definition of outcome variable ( y = W1 * x1 + W2 * x2 + b )
-# with tf.name_scope("model"):
-#     product = tf.matmul(a=x, b=W)
-#     y_pred = tf.add(x=product, y=b, name='prediction')
-# Add summary ops to collect data
-# tf.summary.histogram("weights", W)
-# tf.summary.histogram("biases", b)
-# tf.summary.histogram("y", y_pred)
+# ======================================================================================================================
+# Train model
+sess = tf.InteractiveSession()
+sess.run(fetches=tf.global_variables_initializer())
 
-y_pred = tf.contrib.layers.fully_connected(inputs=x, num_outputs=1, activation_fn=None)
+input_size = len(y_train)
+for s in range(N_ITERATIONS):
+    ind_n = np.random.choice(a=input_size, size=BATCH_SIZE, replace=False)
+    x_batch = x_train[ind_n]
+    y_batch = y_train[ind_n]
 
-# placeholder for true outcome values
-y_true = tf.placeholder(dtype=tf.float32, shape=[None, 1], name='y_true')
+    feed_dict = {x: x_batch, y_true: y_batch}
+    sess.run(fetches=train_step, feed_dict=feed_dict)
 
-# definition for cost function (loss function ...) sum((yt -yp)^2)
-with tf.name_scope("cost"):
-    cost = tf.reduce_mean(input_tensor=tf.square(x=(y_true - y_pred)), name='cost_func')
-    tf.summary.scalar("cost", cost)
+    if s % 1000 == 0:
+        train_loss = loss.eval(feed_dict={x: x_train, y_true: y_train})
+        val_loss = loss.eval(feed_dict={x: x_val, y_true: y_val})
 
-# definition for gradient decent object with step == learning_rate and cost as minimization target
-with tf.name_scope("train"):
-    train_step = tf.train.GradientDescentOptimizer(learning_rate=learning_rate).minimize(loss=cost)
+        msg = "step: {e}/{steps}, loss: {tr_e}, val_loss: {ts_e} ".format(e=s, steps=N_ITERATIONS,
+                                                                          tr_e=train_loss, ts_e=val_loss)
+        print(msg)
 
-# for performance reasons and other things Tensorflow has to be executed within session
-sess = tf.Session()
+# ======================================================================================================================
+y_predictions_train, w, b = prediction.eval(feed_dict={x: x_train})
 
-# Merge all the summaries and write them out to /tmp/logs
-merged = tf.summary.merge_all()
-writer = tf.summary.FileWriter(log_file, sess.graph)
+y_predictions_val = prediction.eval(feed_dict={x: x_val})
 
-# define variable initialisation
-init = tf.global_variables_initializer()
 
-# perform actual variable initialisation
-sess.run(fetches=init)
+# ======================================================================================================================
+def flatten_sort(sort_by, b):
+    if len(sort_by.shape) > 0:
+        sort_by = sort_by.flatten()
+    ind = np.argsort(sort_by)
+    return np.array([sort_by.flatten()[i] for i in ind]), np.array([b.flatten()[i] for i in ind])
 
-# training steps
-for i in range(steps):
-    # create batch of input and true data
-    if datapoint_size == batch_size:
-        batch_start_idx = 0
-    elif datapoint_size < batch_size:
-        raise ValueError("Datapoint size: {datapoint_size}, must be greater than batch size: {batch_size}".format(
-            datapoint_size=datapoint_size,
-            batch_size=batch_size))
-    else:
-        batch_start_idx = (i * batch_size) % (datapoint_size - batch_size)
 
-    batch_end_idx = batch_start_idx + batch_size
-    batch_xs = all_xs_train[batch_start_idx:batch_end_idx]
-    batch_ys = all_ys_train[batch_start_idx:batch_end_idx]
-    xs = np.array(batch_xs)
-    ys = np.array(batch_ys)
+marker_size = 3
+plt.figure()
 
-    # training
-    if i % 10 == 0:
-        all_feed = {x: all_xs_train, y_true: all_ys_train}
-        result = sess.run(fetches=merged, feed_dict=all_feed)
-        writer.add_summary(summary=result, global_step=i)
-    else:
-        feed = {x: xs, y_true: ys}
-        sess.run(fetches=train_step, feed_dict=feed)
-        print("Iteration {iter} and cost is {cost} ".format(iter=i, cost=sess.run(fetches=cost, feed_dict=feed)))
+plt.scatter(x_train, y_train,
+            color='red',
+            label='train-true',
+            s=marker_size)
 
-# print("Actual: W={W} and  b={b}".format(W=actual_W, b=actual_b))
-# print("Predicted: W={W} and  b={b}".format(W=sess.run(fetches=W), b=sess.run(fetches=b)))
+input_train, output_train = flatten_sort(sort_by=x_train, b=y_predictions_train)
+plt.plot(input_train, output_train,
+         color='orange',
+         label='train-predictions',
+         linewidth=4)
 
-y_predictions_tf = y_pred.eval(feed_dict={x: all_xs_test}, session=sess)
+plt.scatter(x_val, y_val,
+            color='blue',
+            label='val-true',
+            s=marker_size)
 
-marker_size = 6
-plt.scatter(np.arange(0, len(y_predictions_tf), step=1), y_predictions_tf, color='black', label='training', s=marker_size*4)
-plt.scatter(np.arange(0, len(all_ys_test), step=1), all_ys_test, color='orange', label='training', s=marker_size/2)
+input_val, output_val = flatten_sort(sort_by=x_val, b=y_predictions_val)
+plt.plot(input_val, output_val,
+         color='black',
+         label='val-predictions')
+
+plt.xlabel("x")
+plt.ylabel("y")
+plt.grid()
+plt.legend()
+# ======================================================================================================================
+# Test
+test_loss = loss.eval(feed_dict={x: x_test, y_true: y_test})
+print("Test loss is: {loss}".format(loss=test_loss))
+y_predictions_test = prediction.eval(feed_dict={x: x_test})
+plt.figure()
+
+plt.scatter(x_test, y_test,
+            color='black',
+            label='test-true',
+            s=marker_size)
+
+input_test, output_test = flatten_sort(sort_by=x_test, b=y_predictions_test)
+plt.plot(input_test, output_test,
+         color='orange',
+         label='test-predictions')
+
+plt.xlabel("x")
+plt.ylabel("y")
+plt.grid()
+plt.legend()
+plt.show()
+# ======================================================================================================================
