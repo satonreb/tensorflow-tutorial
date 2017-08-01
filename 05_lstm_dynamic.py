@@ -62,7 +62,7 @@ df['Date'] = df['Date'].map(lambda st: pd.datetime.strptime(st, '%Y-%m-%d'))
 X = np.array(df['Date'])
 Y = np.array(df['Euro foreign exchange reference rates'])
 # ======================================================================================================================
-# Synthetic Data
+# # Synthetic Data
 # X = np.linspace(start=-5 * np.pi, stop=10 * np.pi, num=500)
 # Y = np.sin(X) / 2 - np.sin(-X*5)
 # ======================================================================================================================
