@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-# import pandas as pd
+import pandas as pd
 import tensorflow as tf
 from sklearn.model_selection import TimeSeriesSplit
 
@@ -44,32 +44,32 @@ def prep_data(array, input_seq_len, output_seq_len, output_seq_steps_ahead, expa
 tf.reset_default_graph()
 # ======================================================================================================================
 # Hyperparameters
-INPUT_SEQUENCE_LENGTH = 28
-OUTPUT_SEQUENCE_LENGTH = 7
-OUTPUT_SEQUENCE_STEPS_AHEAD = 0
+INPUT_SEQUENCE_LENGTH = 14
+OUTPUT_SEQUENCE_LENGTH = 3
+OUTPUT_SEQUENCE_STEPS_AHEAD = 1
 N_SPLITS = 4
-BATCH_SIZE = 70
+BATCH_SIZE = 30
 N_ITERATIONS = 20000
 LSTM_1_N = 64
-DNN_1_N = 16
+DNN_1_N = 32
 INITIAL_LEARNING_RATE = 1e-2
 LEARNING_RATE_DECAY_STEPS = 5000
 LEARNING_RATE_DECAY_RATE = 0.96
 L2_REG_BETA = 1e-5
 log_file = "graphs/lstm"
 # ======================================================================================================================
-# # Real Wold Data
-# DATA_PATH = "data/euro-foreign-exchange-reference-.csv"
-# df = pd.read_csv(DATA_PATH)
-# df = df[:-3]
-# df['Date'] = df['Date'].map(lambda st: pd.datetime.strptime(st, '%Y-%m-%d'))
-# X = np.array(df['Date'])
-# Y = np.array(df['Euro foreign exchange reference rates'])
+# Real Wold Data
+DATA_PATH = "data/euro-foreign-exchange-reference-.csv"
+df = pd.read_csv(DATA_PATH)
+df = df[:-3]
+df['Date'] = df['Date'].map(lambda st: pd.datetime.strptime(st, '%Y-%m-%d'))
+X = np.array(df['Date'])
+Y = np.array(df['Euro foreign exchange reference rates'])
 # ======================================================================================================================
 # Synthetic Data
-X = np.linspace(start=-5 * np.pi, stop=15 * np.pi, num=2000)
-Y = (np.sin(X/2) - np.sin(-X*2) + np.cos(X*3) + X/3)/14
-# plt.plot(X, Y)
+# X = np.linspace(start=-5 * np.pi, stop=15 * np.pi, num=2000)
+# Y = (np.sin(X/2) - np.sin(-X*2) + np.cos(X*3) + X/3)/14
+# # plt.plot(X, Y)
 # ======================================================================================================================
 
 x_input, x_output = prep_data(array=X, input_seq_len=INPUT_SEQUENCE_LENGTH, output_seq_len=OUTPUT_SEQUENCE_LENGTH,
@@ -92,27 +92,40 @@ for train_index, val_index in TimeSeriesSplit(n_splits=N_SPLITS).split(y_input_t
     y_output_train, y_output_val = y_output_train_val[train_index], y_output_train_val[val_index]
 
 # ======================================================================================================================
+FEATURES = y_input_train.shape[2]
+DNN_KEEP_PROB = 0.5
+RNN_KEEP_PROB = 0.6
+
+# ======================================================================================================================
 # Define model
-with tf.name_scope('SETUP'):
-    training = tf.placeholder(dtype=tf.bool, name='phase')
+with tf.name_scope('setup'):
+    training = tf.placeholder(dtype=tf.bool, name='training_phase')
+    rnn_keep_prob = tf.cond(pred=training,
+                            true_fn=lambda: RNN_KEEP_PROB,
+                            false_fn=lambda: 1.0,
+                            name='RNN_dropout_keep_probability')
+    with tf.name_scope('learning_rate'):
+        global_step = tf.Variable(initial_value=0, trainable=False)
+        learning_rate = tf.train.exponential_decay(learning_rate=INITIAL_LEARNING_RATE, global_step=global_step,
+                                                   decay_steps=LEARNING_RATE_DECAY_STEPS,
+                                                   decay_rate=LEARNING_RATE_DECAY_RATE, staircase=True)
+        variable_summaries(learning_rate)
 
-    global_step = tf.Variable(initial_value=0, trainable=False)
-    learning_rate = tf.train.exponential_decay(learning_rate=INITIAL_LEARNING_RATE, global_step=global_step,
-                                               decay_steps=LEARNING_RATE_DECAY_STEPS,
-                                               decay_rate=LEARNING_RATE_DECAY_RATE, staircase=True)
-
-    # Input is of shape [BATCH_COUNT, SEQUENCE_LENGTH, FEATURES]
-    FEATURES = y_input_train.shape[2]
-    x = tf.placeholder(dtype=tf.float32, shape=[None, INPUT_SEQUENCE_LENGTH, FEATURES], name='X')
-    # Input accepts arbitrary length sequence as input variable
-    # x = tf.placeholder(dtype=tf.float32, shape=[None, None, FEATURES], name='x')
-    variable_summaries(learning_rate)
+    with tf.name_scope('inputs'):
+        # Input is of shape [BATCH_COUNT, SEQUENCE_LENGTH, FEATURES]
+        x = tf.placeholder(dtype=tf.float32, shape=[None, INPUT_SEQUENCE_LENGTH, FEATURES], name='x')
+        y_true = tf.placeholder(dtype=tf.float32, shape=[None, OUTPUT_SEQUENCE_LENGTH, 1], name='ground_truth')
+        # Input accepts arbitrary length sequence as input variable
+        # x = tf.placeholder(dtype=tf.float32, shape=[None, None, FEATURES], name='input')
+        # y_true = tf.placeholder(dtype=tf.float32, shape=[None, None, 1], name='ground_truth')
 
 # Define RNN bit
 with tf.name_scope('RNN'):
     # cell = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_1_N)
     cell = tf.contrib.rnn.LayerNormBasicLSTMCell(num_units=LSTM_1_N)
-    rnn_output, _ = tf.nn.dynamic_rnn(cell=cell, inputs=x, dtype=tf.float32)
+
+    cell_dropout = tf.nn.rnn_cell.DropoutWrapper(cell=cell, output_keep_prob=rnn_keep_prob)
+    rnn_output, _ = tf.nn.dynamic_rnn(cell=cell_dropout, inputs=x, dtype=tf.float32)
 
 # Define Dense bit
 with tf.name_scope('DNN'):
@@ -123,32 +136,24 @@ with tf.name_scope('DNN'):
     output = tf.transpose(a=rnn_output, perm=[1, 0, 2])
     # last = tf.gather(val, int(val.get_shape()[0]) - 1)
     last = output[-1]
-    dnn = tf.layers.dense(inputs=last, units=DNN_1_N, kernel_regularizer=l2_regulariser)
+    dnn = tf.layers.dense(inputs=last, units=DNN_1_N, kernel_regularizer=l2_regulariser, activation=tf.nn.relu)
 
-    dnn_reg = tf.layers.batch_normalization(inputs=dnn, training=training)
+    dnn_output = tf.layers.dropout(inputs=dnn, rate=DNN_KEEP_PROB, training=training)
 
-    dnn_output = tf.nn.relu(dnn_reg)
-
-
-with tf.name_scope('LR'):
+with tf.name_scope('prediciton'):
     y_pred = tf.layers.dense(inputs=dnn_output, units=OUTPUT_SEQUENCE_LENGTH)
     prediction = tf.expand_dims(input=y_pred, axis=2)
     variable_summaries(prediction)
 
 # ======================================================================================================================
 # Define loss
-with tf.name_scope('LOSS'):
-    y_true = tf.placeholder(dtype=tf.float32, shape=[None, OUTPUT_SEQUENCE_LENGTH, 1], name='TRUTH')
-    # y_true = tf.placeholder(dtype=tf.float32, shape=[None, None, 1], name='truth')
+with tf.name_scope('loss'):
     reconstruction_loss = tf.reduce_mean(input_tensor=tf.square(x=tf.subtract(x=prediction, y=y_true)))
     reg_losses = tf.get_collection(key=tf.GraphKeys.REGULARIZATION_LOSSES)
     loss = tf.add_n(inputs=[reconstruction_loss]+reg_losses)
-
-    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-    with tf.control_dependencies(update_ops):
-        # Ensures that we execute the update_ops before performing the train_step
-        train_step = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss=loss, global_step=global_step)
-        variable_summaries(loss)
+    # Ensures that we execute the update_ops before performing the train_step
+    train_step = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss=loss, global_step=global_step)
+    variable_summaries(loss)
 
 # ======================================================================================================================
 # Train model
@@ -168,7 +173,7 @@ for s in range(N_ITERATIONS):
     sess.run(fetches=train_step, feed_dict=feed_dict)
 
     if s % 1000 == 0:
-        train_loss = loss.eval(feed_dict={x: y_input_train, y_true: y_output_train, training: False})
+        train_loss = loss.eval(feed_dict={x: x_batch, y_true: y_batch, training: False})
         val_loss = loss.eval(feed_dict={x: y_input_val, y_true: y_output_val, training: False})
 
         msg = "step: {e}/{steps}, loss: {tr_e}, val_loss: {ts_e} ".format(e=s, steps=N_ITERATIONS,
@@ -212,7 +217,7 @@ test_loss = loss.eval(feed_dict={x: y_input_test, y_true: y_output_test, trainin
 print("Test loss is: {loss}".format(loss=test_loss))
 y_predictions_test = prediction.eval(feed_dict={x: y_input_test, training: False})
 plt.figure()
-a = -1
+a = 0
 
 plt.plot(x_input_test[a], y_input_test[a, :, 0],
          color='black',
