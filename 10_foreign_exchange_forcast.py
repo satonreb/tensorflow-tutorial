@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
+# import pandas as pd
 import tensorflow as tf
 from sklearn.model_selection import TimeSeriesSplit
 
@@ -53,7 +53,7 @@ N_ITERATIONS = 20000
 LSTM_1_N = 64
 DNN_1_N = 16
 INITIAL_LEARNING_RATE = 1e-2
-LEARNING_RATE_DECAY_STEPS = 1000
+LEARNING_RATE_DECAY_STEPS = 5000
 LEARNING_RATE_DECAY_RATE = 0.96
 L2_REG_BETA = 1e-5
 log_file = "graphs/lstm"
@@ -67,8 +67,9 @@ log_file = "graphs/lstm"
 # Y = np.array(df['Euro foreign exchange reference rates'])
 # ======================================================================================================================
 # Synthetic Data
-X = np.linspace(start=-5 * np.pi, stop=10 * np.pi, num=500)
-Y = np.sin(X) / 2 - np.sin(-X*5) + X/10
+X = np.linspace(start=-5 * np.pi, stop=15 * np.pi, num=2000)
+Y = (np.sin(X/2) - np.sin(-X*2) + np.cos(X*3) + X/3)/14
+# plt.plot(X, Y)
 # ======================================================================================================================
 
 x_input, x_output = prep_data(array=X, input_seq_len=INPUT_SEQUENCE_LENGTH, output_seq_len=OUTPUT_SEQUENCE_LENGTH,
@@ -93,7 +94,7 @@ for train_index, val_index in TimeSeriesSplit(n_splits=N_SPLITS).split(y_input_t
 # ======================================================================================================================
 # Define model
 with tf.name_scope('SETUP'):
-    phase = tf.placeholder(dtype=tf.bool, name='phase')
+    training = tf.placeholder(dtype=tf.bool, name='phase')
 
     global_step = tf.Variable(initial_value=0, trainable=False)
     learning_rate = tf.train.exponential_decay(learning_rate=INITIAL_LEARNING_RATE, global_step=global_step,
@@ -109,7 +110,8 @@ with tf.name_scope('SETUP'):
 
 # Define RNN bit
 with tf.name_scope('RNN'):
-    cell = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_1_N)
+    # cell = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_1_N)
+    cell = tf.contrib.rnn.LayerNormBasicLSTMCell(num_units=LSTM_1_N)
     rnn_output, _ = tf.nn.dynamic_rnn(cell=cell, inputs=x, dtype=tf.float32)
 
 # Define Dense bit
@@ -119,10 +121,11 @@ with tf.name_scope('DNN'):
         l2_regulariser = tf.contrib.layers.l2_regularizer(scale=L2_REG_BETA)
 
     output = tf.transpose(a=rnn_output, perm=[1, 0, 2])
+    # last = tf.gather(val, int(val.get_shape()[0]) - 1)
     last = output[-1]
     dnn = tf.layers.dense(inputs=last, units=DNN_1_N, kernel_regularizer=l2_regulariser)
 
-    dnn_reg = tf.contrib.layers.batch_norm(inputs=dnn, center=True, scale=True, is_training=phase)
+    dnn_reg = tf.layers.batch_normalization(inputs=dnn, training=training)
 
     dnn_output = tf.nn.relu(dnn_reg)
 
@@ -161,23 +164,23 @@ for s in range(N_ITERATIONS):
     x_batch = y_input_train[ind_n]
     y_batch = y_output_train[ind_n]
 
-    feed_dict = {x: x_batch, y_true: y_batch, phase: True}
+    feed_dict = {x: x_batch, y_true: y_batch, training: True}
     sess.run(fetches=train_step, feed_dict=feed_dict)
 
     if s % 1000 == 0:
-        train_loss = loss.eval(feed_dict={x: y_input_train, y_true: y_output_train, phase: False})
-        val_loss = loss.eval(feed_dict={x: y_input_val, y_true: y_output_val, phase: False})
+        train_loss = loss.eval(feed_dict={x: y_input_train, y_true: y_output_train, training: False})
+        val_loss = loss.eval(feed_dict={x: y_input_val, y_true: y_output_val, training: False})
 
         msg = "step: {e}/{steps}, loss: {tr_e}, val_loss: {ts_e} ".format(e=s, steps=N_ITERATIONS,
                                                                           tr_e=train_loss, ts_e=val_loss)
         print(msg)
 
-        summary = merged.eval(feed_dict={x: y_input_val, y_true: y_output_val, phase: False})
+        summary = merged.eval(feed_dict={x: y_input_val, y_true: y_output_val, training: False})
         writer.add_summary(summary, s)
 
 # ======================================================================================================================
-y_predictions_train = prediction.eval(feed_dict={x: y_input_train, phase: False})
-y_predictions_val = prediction.eval(feed_dict={x: y_input_val, phase: False})
+y_predictions_train = prediction.eval(feed_dict={x: y_input_train, training: False})
+y_predictions_val = prediction.eval(feed_dict={x: y_input_val, training: False})
 # ======================================================================================================================
 marker_size = 10
 plt.figure()
@@ -205,9 +208,9 @@ plt.grid()
 plt.legend()
 # ======================================================================================================================
 # Test
-test_loss = loss.eval(feed_dict={x: y_input_test, y_true: y_output_test, phase: False})
+test_loss = loss.eval(feed_dict={x: y_input_test, y_true: y_output_test, training: False})
 print("Test loss is: {loss}".format(loss=test_loss))
-y_predictions_test = prediction.eval(feed_dict={x: y_input_test, phase: False})
+y_predictions_test = prediction.eval(feed_dict={x: y_input_test, training: False})
 plt.figure()
 a = -1
 
