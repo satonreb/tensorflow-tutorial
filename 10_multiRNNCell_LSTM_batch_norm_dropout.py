@@ -58,18 +58,18 @@ LEARNING_RATE_DECAY_RATE = 0.96
 L2_REG_BETA = 1e-5
 log_file = "graphs/lstm"
 # ======================================================================================================================
-# Real Wold Data
-DATA_PATH = "data/euro-foreign-exchange-reference-.csv"
-df = pd.read_csv(DATA_PATH)
-df = df[:-3]
-df['Date'] = df['Date'].map(lambda st: pd.datetime.strptime(st, '%Y-%m-%d'))
-X = np.array(df['Date'])
-Y = np.array(df['Euro foreign exchange reference rates'])
+# # Real Wold Data
+# DATA_PATH = "data/euro-foreign-exchange-reference-.csv"
+# df = pd.read_csv(DATA_PATH)
+# df = df[:-3]
+# df['Date'] = df['Date'].map(lambda st: pd.datetime.strptime(st, '%Y-%m-%d'))
+# X = np.array(df['Date'])
+# Y = np.array(df['Euro foreign exchange reference rates'])
 # ======================================================================================================================
 # Synthetic Data
-# X = np.linspace(start=-5 * np.pi, stop=15 * np.pi, num=2000)
-# Y = (np.sin(X/2) - np.sin(-X*2) + np.cos(X*3) + X/3)/14
-# # plt.plot(X, Y)
+X = np.linspace(start=-5 * np.pi, stop=15 * np.pi, num=2000)
+Y = (np.sin(X/2) - np.sin(-X*2) + np.cos(X*3) + X/3)/14
+# plt.plot(X, Y)
 # ======================================================================================================================
 
 x_input, x_output = prep_data(array=X, input_seq_len=INPUT_SEQUENCE_LENGTH, output_seq_len=OUTPUT_SEQUENCE_LENGTH,
@@ -94,16 +94,19 @@ for train_index, val_index in TimeSeriesSplit(n_splits=N_SPLITS).split(y_input_t
 # ======================================================================================================================
 FEATURES = y_input_train.shape[2]
 DNN_KEEP_PROB = 0.5
-RNN_KEEP_PROB = 0.6
+RNN_KEEP_PROB = 0.3
+RNN_DEPTH = 3
 
 # ======================================================================================================================
 # Define model
 with tf.name_scope('setup'):
-    training = tf.placeholder(dtype=tf.bool, name='training_phase')
-    rnn_keep_prob = tf.cond(pred=training,
-                            true_fn=lambda: RNN_KEEP_PROB,
-                            false_fn=lambda: 1.0,
-                            name='RNN_dropout_keep_probability')
+    with tf.name_scope('variable_placeholders'):
+        training = tf.placeholder(dtype=tf.bool, name='training_phase')
+        rnn_keep_prob = tf.cond(pred=training,
+                                true_fn=lambda: RNN_KEEP_PROB,
+                                false_fn=lambda: 1.0,
+                                name='RNN_dropout_keep_probability')
+
     with tf.name_scope('learning_rate'):
         global_step = tf.Variable(initial_value=0, trainable=False)
         learning_rate = tf.train.exponential_decay(learning_rate=INITIAL_LEARNING_RATE, global_step=global_step,
@@ -122,22 +125,24 @@ with tf.name_scope('setup'):
 # Define RNN bit
 with tf.name_scope('RNN'):
     # cell = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_1_N)
-    cell = tf.contrib.rnn.LayerNormBasicLSTMCell(num_units=LSTM_1_N)
-
-    cell_dropout = tf.nn.rnn_cell.DropoutWrapper(cell=cell, output_keep_prob=rnn_keep_prob)
-    rnn_output, _ = tf.nn.dynamic_rnn(cell=cell_dropout, inputs=x, dtype=tf.float32)
+    lstm_cells = []
+    for nu in range(0, RNN_DEPTH):
+        lstm = tf.contrib.rnn.LayerNormBasicLSTMCell(num_units=LSTM_1_N // 2**nu)
+        lstm_dropout = tf.nn.rnn_cell.DropoutWrapper(cell=lstm, output_keep_prob=rnn_keep_prob)
+        lstm_cells.append(lstm_dropout)
+    cells = tf.nn.rnn_cell.MultiRNNCell(cells=lstm_cells)
+    rnn_output, _ = tf.nn.dynamic_rnn(cell=cells, inputs=x, dtype=tf.float32)
 
 # Define Dense bit
 with tf.name_scope('DNN'):
     # Regularisation
-    with tf.name_scope('L2_REG'):
+    with tf.name_scope('l2_regulariser'):
         l2_regulariser = tf.contrib.layers.l2_regularizer(scale=L2_REG_BETA)
 
     output = tf.transpose(a=rnn_output, perm=[1, 0, 2])
     # last = tf.gather(val, int(val.get_shape()[0]) - 1)
     last = output[-1]
     dnn = tf.layers.dense(inputs=last, units=DNN_1_N, kernel_regularizer=l2_regulariser, activation=tf.nn.relu)
-
     dnn_output = tf.layers.dropout(inputs=dnn, rate=DNN_KEEP_PROB, training=training)
 
 with tf.name_scope('prediciton'):
@@ -151,7 +156,6 @@ with tf.name_scope('loss'):
     reconstruction_loss = tf.reduce_mean(input_tensor=tf.square(x=tf.subtract(x=prediction, y=y_true)))
     reg_losses = tf.get_collection(key=tf.GraphKeys.REGULARIZATION_LOSSES)
     loss = tf.add_n(inputs=[reconstruction_loss]+reg_losses)
-    # Ensures that we execute the update_ops before performing the train_step
     train_step = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss=loss, global_step=global_step)
     variable_summaries(loss)
 
