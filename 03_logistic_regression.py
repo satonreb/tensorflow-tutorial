@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
 
-# Script shows how to use TensorFlow for logistic regression for multiple features and classes, 
+# Script shows how to use TensorFlow for logistic regression for multiple features and classes,
 # and use batches for the training.
 
 # CUSTOMIZABLE: Collect/Prepare data

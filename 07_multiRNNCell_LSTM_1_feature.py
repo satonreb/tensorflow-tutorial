@@ -67,8 +67,8 @@ log_file = "graphs/lstm"
 # ======================================================================================================================
 # Synthetic Data
 X = np.linspace(start=-5 * np.pi, stop=10 * np.pi, num=500)
-Y = np.sin(X) / 2 - np.sin(-X * 5) + X
-X = X / (10 * np.pi)
+Y = np.sin(X) / 2 - np.sin(-X * 5)
+Y = Y / (10 * np.pi)
 # plt.plot(X, Y)
 # ======================================================================================================================
 
@@ -112,20 +112,21 @@ with tf.name_scope('RNN'):
     lstm_1 = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_1_N)
     lstm_2 = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_1_N // 2)
     cells = tf.nn.rnn_cell.MultiRNNCell(cells=[lstm_1, lstm_2])
-    rnn_output, _ = tf.nn.dynamic_rnn(cell=cells, inputs=x, dtype=tf.float32)
+    rnn_output, rnn_state = tf.nn.dynamic_rnn(cell=cells, inputs=x, dtype=tf.float32)
 
-# Regularisation
-with tf.name_scope('L2_REG'):
-    l2_regulariser = tf.contrib.layers.l2_regularizer(scale=L2_REG_BETA)
-    he_init = tf.contrib.layers.variance_scaling_initializer()  # He initialization
+# # Regularisation
+# with tf.name_scope('L2_REG'):
+#     l2_regulariser = tf.contrib.layers.l2_regularizer(scale=L2_REG_BETA)
+#     he_init = tf.contrib.layers.variance_scaling_initializer()  # He initialization
 
 # Define Dense bit
 with tf.name_scope('DNN'):
-    output = tf.transpose(a=rnn_output, perm=[1, 0, 2])
-    last_rnn = output[-1]
+    # output = tf.transpose(a=rnn_output, perm=[1, 0, 2])
+    last_rnn = rnn_state[-1].h
     # last = tf.gather(output, int(output.get_shape()[0]) - 1)
-    fc_1 = tf.layers.dense(inputs=last_rnn, units=FC_1_N, activation=tf.nn.relu,
-                           kernel_initializer=he_init, kernel_regularizer=l2_regulariser)
+    # fc_1 = tf.layers.dense(inputs=last_rnn, units=FC_1_N, activation=tf.nn.relu,
+    #                        kernel_initializer=he_init, kernel_regularizer=l2_regulariser)
+    fc_1 = tf.layers.dense(inputs=last_rnn, units=FC_1_N, activation=tf.nn.relu)
     variable_summaries(fc_1)
 
 with tf.name_scope('LR'):
@@ -139,9 +140,9 @@ with tf.name_scope('LR'):
 with tf.name_scope('LOSS'):
     y_true = tf.placeholder(dtype=tf.float32, shape=[None, OUTPUT_SEQUENCE_LENGTH, 1], name='TRUTH')
     # y_true = tf.placeholder(dtype=tf.float32, shape=[None, None], name='truth')
-    reconstruction_loss = tf.reduce_mean(input_tensor=tf.square(x=tf.subtract(x=y_pred, y=y_true)))
-    reg_losses = tf.get_collection(key=tf.GraphKeys.REGULARIZATION_LOSSES)
-    loss = tf.add_n([reconstruction_loss] + reg_losses)
+    loss = tf.reduce_mean(input_tensor=tf.square(x=tf.subtract(x=y_pred, y=y_true)))
+    # reg_losses = tf.get_collection(key=tf.GraphKeys.REGULARIZATION_LOSSES)
+    # loss = tf.add_n([loss] + reg_losses)
     train_step = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss=loss, global_step=global_step)
     variable_summaries(loss)
 
