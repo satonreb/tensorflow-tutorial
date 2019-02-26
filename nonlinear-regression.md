@@ -51,7 +51,7 @@ This function combines multiple fully-connected layers of a variable size. The f
 
 Computational graph for this model can be presented as
 
-![Graph for Nonlinear Regression](.gitbook/assets/image3.svg)
+![Graph for Nonlinear Regression](assets/image3.svg)
 
 We can see that the graph is very similar to the graph presented for the Logistic Regression. In addition to the _Inputs, Regression Model and Metrics sections \_we now have \_Hidden Layers_ subsection that contains N number of fully-connected layers stacked layers. The output of this subsection is passed to the _Predictions_ node which then is used to compute `loss` and other quantities in _Metrics_ section.
 
@@ -115,7 +115,7 @@ In this chapter, we saw how to create Feed-forward Neural Network just by adding
 
 ## Code
 
-* [03\_nonlinear\_regression.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/scripts/03_nonlinear_regression.py)
+* [03\_nonlinear\_regression.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/03_nonlinear_regression.py)
 
 ## References
 

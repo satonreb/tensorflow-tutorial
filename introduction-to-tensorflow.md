@@ -65,7 +65,7 @@ product = tf.matmul(matrix1, matrix2)
 
 The default graph now has three nodes: two `tf.constant()` _ops_ and one `tf.matmul()` _op._ If we try to draw it on a paper then it could look stomething like this:
 
-![Simple Graph](.gitbook/assets/image1.svg)
+![Simple Graph](assets/image1.svg)
 
 If we try to execute the code presented above, we, unfortunately, will not get a useful answer. In Tenserflow to actually perform the computation and get the result, we have to launch the graph in a session. Thus, to multiply the matrices and get the result of the multiplication, we have to create a `Session` object without arguments, which launches the default graph.
 
@@ -101,7 +101,7 @@ TensorFlow takes in Python native types such as Python boolean, numeric values \
 
 ## Code
 
-* [00\_first\_step.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/scripts/00_first_step.py)
+* [00\_first\_step.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/00_first_step.py)
 
 ## References
 

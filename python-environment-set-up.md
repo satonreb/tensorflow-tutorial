@@ -48,5 +48,5 @@ While in the environment, you can run any Python command or/and script but it wi
 
 ## Code
 
-* [environment.yml](https://github.com/satonreb/tensorflow-tutorial/blob/master/scripts/environment.yml)
+* [environment.yml](https://github.com/satonreb/tensorflow-tutorial/blob/master/environment.yml)
 

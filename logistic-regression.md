@@ -32,7 +32,7 @@ In this example, the scaling function outputs numpy array of the same size as in
 As mentioned in the previous chapter, the most differentiating part of the TensorFlow from the other libraries is that a model or "an analysis plan" has to be constructed before it is actually executed. In TensorFlow models are represented as [graphs](https://www.tensorflow.org/api_guides/python/framework) where operations as nodes and edges carry tensors/weights.  
 Our task is to build the following graph:
 
-![Graph for Logistic Regression task](.gitbook/assets/image2.svg)
+![Graph for Logistic Regression task](assets/image2.svg)
 
 I what follows we are going to follow the same structure as it can be seen in the graph above, thus we start with setting up inputs.
 
@@ -219,7 +219,7 @@ This concludes the description of the Logistic Regression and in the [next chapt
 
 ## Code
 
-* [01\_logistic\_regression.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/scripts/01_logistic_regression.py)
+* [01\_logistic\_regression.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/01_logistic_regression.py)
 
 ## References
 

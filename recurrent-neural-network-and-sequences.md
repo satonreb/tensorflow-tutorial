@@ -2,13 +2,13 @@
 
 In this chapter, we are going to cover the case when we have input sequences with variable lengths and the case when we want to predict a time sequence rather just a point in time. Later is achieved by a **many to many** type recurrent neural network.
 
-![Many to many RNN](.gitbook/assets/image5.svg)
+![Many to many RNN](assets/image5.svg)
 
 We will start with time sequence prediction as it requires only a slight adjustment to the code that we considered in the previous chapter.
 
 ## Sequence prediction
 
-The dataset used in this example is the same as before. The only difference in the data preparation step is that instead of having one target vector for each input sequence, we have a sequence of target vectors with the same length as the input sequence. See [05\_01\_rnn\_seq.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/scripts/05_01_rnn_seq.py) script.
+The dataset used in this example is the same as before. The only difference in the data preparation step is that instead of having one target vector for each input sequence, we have a sequence of target vectors with the same length as the input sequence. See [05\_01\_rnn\_seq.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/05_01_rnn_seq.py) script.
 
 > Note: Restriction of having equal input and output sequence lengths is set for convenience rather than necessity, thus feel free to play around.
 
@@ -40,9 +40,9 @@ As you can see we have introduced a new variable scope `output_projection`, wher
 
 So far we have used only fixed-size input sequences. What if the input sequences have variable lengths, like patients medical or companies transaction histories?
 
-![Record Sequences](.gitbook/assets/image6.svg)
+![Record Sequences](assets/image6.svg)
 
-This example will consider exactly this situation, see [05\_02\_rnn\_variable\_seq.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/scripts/05_02_rnn_variable_seq.py).
+This example will consider exactly this situation, see [05\_02\_rnn\_variable\_seq.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/05_02_rnn_variable_seq.py).
 
 We start with obtaining a data set, that in this case is going to be generated from scratch. For this we are using `get_values()`, `create_features()` and `create_targets()` functions. Here the feature array output shape is `[Record_count, Max_Sequence_Lenght, Feature_count]` and for the target array it is `[Record_count, 1, Feature_count]`. As you can see the feature array on the input to the graph contains sequences of the same length, it is equal to `Max_Sequence_Lenght`. This is due to the requirement that tensors that are passed to a graph have to have consistent dimensions. However, if we take a closer look at `create_features()` function,
 
@@ -92,6 +92,6 @@ Sadly, these are the last examples that this tutorial will present. In the [next
 
 ## Code
 
-* [05\_01\_rnn\_seq.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/scripts/05_01_rnn_seq.py)
-* [05\_02\_rnn\_variable\_seq.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/scripts/05_02_rnn_variable_seq.py)
+* [05\_01\_rnn\_seq.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/05_01_rnn_seq.py)
+* [05\_02\_rnn\_variable\_seq.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/05_02_rnn_variable_seq.py)
 
