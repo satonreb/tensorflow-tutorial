@@ -6,7 +6,7 @@ First of all, ensure that you have installed **conda** package manager. If you h
 
 > Note: Python version required to run the provided scripts is **3.6.2** and for TensorFlow it is **1.3.0**.
 
-Further, git clone all the scripts that are available in [this repository](https://github.com/satonreb/machine-learning-using-tensorflow) and then using the command line to switch to the location of the cloned files. In `Scripts` directory you should see `environment.yml` file that specifies the name of the conda environment and packages that will be installed. To create the environment run the following command while in `Scripts` directory:
+Further, git clone all the scripts that are available in [this repository](https://github.com/satonreb/tensorflow-tutorial) and then using the command line to switch to the location of the cloned files. In `Scripts` directory you should see `environment.yml` file that specifies the name of the conda environment and packages that will be installed. To create the environment run the following command while in `Scripts` directory:
 
 ```bash
 conda env create -f environment.yml
@@ -32,7 +32,7 @@ activate tf_tutorial
 
 Here **tf\_tutorial** is the default environment name that is specified in `environment.yml` file. Hence, if you have replaced it, replace it in the commands above.
 
-While in the environment, you can run any Python command or/and script but it will use only packages that are available in the envirment. This tutorial is using the following packages:
+While in the environment, you can run any Python command or/and script but it will use only packages that are available in the environment. This tutorial is using the following packages:
 
 * [python](https://www.python.org/)
 * [matplotlib](https://matplotlib.org/)
@@ -48,5 +48,5 @@ While in the environment, you can run any Python command or/and script but it wi
 
 ## Code
 
-* [environment.yml](https://github.com/satonreb/machine-learning-using-tensorflow/blob/master/scripts/environment.yml)
+* [environment.yml](https://github.com/satonreb/tensorflow-tutorial/blob/master/scripts/environment.yml)
 

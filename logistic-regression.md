@@ -219,7 +219,7 @@ This concludes the description of the Logistic Regression and in the [next chapt
 
 ## Code
 
-* [01\_logistic\_regression.py](https://github.com/satonreb/machine-learning-using-tensorflow/blob/master/scripts/01_logistic_regression.py)
+* [01\_logistic\_regression.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/scripts/01_logistic_regression.py)
 
 ## References
 

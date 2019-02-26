@@ -128,7 +128,7 @@ In the [next chapter](nonlinear-regression.md) we will see how to modify the cod
 
 ## Code
 
-* [02\_linear\_regression.py](https://github.com/satonreb/machine-learning-using-tensorflow/blob/master/scripts/02_linear_regression.py)
+* [02\_linear\_regression.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/scripts/02_linear_regression.py)
 
 ## References
 

@@ -2,7 +2,7 @@
 
 In all previous chapters, we essentially presented [Feed-forward Neural Networks](https://medium.com/towards-data-science/deep-learning-feedforward-neural-network-26a6705dbdc7) \(FNN\) that varied in size and purpose. These type of networks work well on structured \(fact based\) data where both event order information and location relative to other records is irrelevant. However, this, as you might imagine, is not always the case.
 
-For example, consider images, where every pixel has a value and a specific location. This pixel's value by itself does not provide us with much information and it defiantly does not help us to understand the image. Thus in order to _see_ the image, pixel's neighbours and their neighbour have to be considered. For these type of problems, the [Convolutional Neural Networks](http://cs231n.github.io/convolutional-networks/) \(CNN, _not the news agency!_\) are used, as they are created to learn from the information that is contained in the pixel and also around it. In this tutorial, we will not discuss this type of networks as they are not often used on the structured data, like, patient records, transaction records, etc.
+For example, consider images, where every pixel has a value and a specific location. This pixel's value by itself does not provide us with much information and it defiantly does not help us to understand the image. Thus in order to _see_ the image, pixel's neighbors and their neighbor have to be considered. For these type of problems, the [Convolutional Neural Networks](http://cs231n.github.io/convolutional-networks/) \(CNN, _not the news agency!_\) are used, as they are created to learn from the information that is contained in the pixel and also around it. In this tutorial, we will not discuss this type of networks as they are not often used on the structured data, like, patient records, transaction records, etc.
 
 The other type of network that is gaining popularity is the [Recurrent Neural Network](http://karpathy.github.io/2015/05/21/rnn-effectiveness/) \(RNN\). This type of network is called recurrent because each neuron in the layer repeats the same computation for all elements in a sequence of inputs. RNNs are becoming very popular due to their use in language processing, where a word order is as important as the word by itself. Similarly, if we consider a patient medical history, in order to make a _good_ prediction for some condition, it is not only important to know what the patient had before but also when it occurred.
 
@@ -113,9 +113,9 @@ Remaining steps in the graph are the same as earlier examples, with one exceptio
 
 Graph execution follows the same steps as in previous examples. The only modification that has been done is for `feed_dict` parameter, as it now allows the third value, `training`, that tells the graph if we perform training or not and that subsequently turns on and off the dropout layer.
 
-This chapter has references to two python scripts. The first of which, [04\_01\_dropout.py](https://github.com/satonreb/machine-learning-using-tensorflow/blob/master/scripts/04_01_dropout.py). was described in detail above, but as the second scripts have only one change, we will explain only it.
+This chapter has references to two python scripts. The first of which, [04\_01\_dropout.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/scripts/04_01_dropout.py). was described in detail above, but as the second scripts have only one change, we will explain only it.
 
-In the script [04\_02\_rnn\_dropout.py](https://github.com/satonreb/machine-learning-using-tensorflow/blob/master/scripts/04_02_rnn_dropout.py), we show how to add a dropout layer around RNN cells. To do this we use [`tf.nn.rnn_cell.DropoutWrapper()`](https://www.tensorflow.org/api_docs/python/tf/contrib/rnn/DropoutWrapper). Specifying dropout probabilities for `input_keep_prob` and `output_keep_prob` parameters we can add dropout to inputs and outputs for the given cell. Unfortunately, at this moment, this function does not take the parameter that informs the wrapper if we are training or testing the model, as it was in the case of `tf.layers.dropout()`. To resolve this issue, as mentioned earlier, we can use more than one approach. However, as we have already introduced the boolean switch `training`, we will show how to use it.
+In the script [04\_02\_rnn\_dropout.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/scripts/04_02_rnn_dropout.py), we show how to add a dropout layer around RNN cells. To do this we use [`tf.nn.rnn_cell.DropoutWrapper()`](https://www.tensorflow.org/api_docs/python/tf/contrib/rnn/DropoutWrapper). Specifying dropout probabilities for `input_keep_prob` and `output_keep_prob` parameters we can add dropout to inputs and outputs for the given cell. Unfortunately, at this moment, this function does not take the parameter that informs the wrapper if we are training or testing the model, as it was in the case of `tf.layers.dropout()`. To resolve this issue, as mentioned earlier, we can use more than one approach. However, as we have already introduced the boolean switch `training`, we will show how to use it.
 
 ```python
 with tf.variable_scope("recurrent_layer"):
@@ -164,7 +164,7 @@ In practical applications when using Neural Networks, it is often better to have
 
 Frobenius regularisation is similar to L2 regularisation and thus for brevity, we are going to skip the explanations here.
 
-In the script, [04\_03\_rnn\_l2.py](https://github.com/satonreb/machine-learning-using-tensorflow/blob/master/scripts/04_03_rnn_l2.py), Frobenius regularisation is impmendenatin can be found under `Frobenius_regularization` variable scope,
+In the script, [04\_03\_rnn\_l2.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/scripts/04_03_rnn_l2.py), Frobenius regularisation is impmendenatin can be found under `Frobenius_regularization` variable scope,
 
 ```python
 # Creates a fully-connected layer with Frobenius (l2) regularization and tanh activation
@@ -196,7 +196,7 @@ Dropout, in the nutshell, is a technique where during the training iterations a 
 
 Dropout does tend to significantly slow down convergence, but it usually results in a much better model when tuned properly. So, it is generally well worth the extra time and effort. It is important to note that dropout, during the evaluation and prediction phases, has to be turned off. Dropout is often used in the Convolutional Neural Networks but for Recurrent Neural Networks, it has not been wildly accepted.
 
-Dropout implementation example for fully-connected layer can be found in [04\_01\_dropout.py](https://github.com/satonreb/machine-learning-using-tensorflow/blob/master/scripts/04_01_dropout.py) and for RNN layers in [04\_02\_rnn\_dropout.py](https://github.com/satonreb/machine-learning-using-tensorflow/blob/master/scripts/04_02_rnn_dropout.py) script.
+Dropout implementation example for fully-connected layer can be found in [04\_01\_dropout.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/scripts/04_01_dropout.py) and for RNN layers in [04\_02\_rnn\_dropout.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/scripts/04_02_rnn_dropout.py) script.
 
 > Note: It is advisable to use neural networks with many layers that have a small number of neurons per layer.
 
@@ -266,9 +266,9 @@ In the [next chapter](recurrent-neural-network-and-sequences.md) we will show ho
 
 ## Code
 
-* [04\_01\_dropout.py](https://github.com/satonreb/machine-learning-using-tensorflow/blob/master/scripts/04_01_dropout.py)
-* [04\_02\_rnn\_dropout.py](https://github.com/satonreb/machine-learning-using-tensorflow/blob/master/scripts/04_02_rnn_dropout.py)
-* [04\_03\_rnn\_l2.py](https://github.com/satonreb/machine-learning-using-tensorflow/blob/master/scripts/04_03_rnn_l2.py)
+* [04\_01\_dropout.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/scripts/04_01_dropout.py)
+* [04\_02\_rnn\_dropout.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/scripts/04_02_rnn_dropout.py)
+* [04\_03\_rnn\_l2.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/scripts/04_03_rnn_l2.py)
 
 ## References
 

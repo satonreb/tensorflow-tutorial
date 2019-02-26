@@ -115,7 +115,7 @@ In this chapter, we saw how to create Feed-forward Neural Network just by adding
 
 ## Code
 
-* [03\_nonlinear\_regression.py](https://github.com/satonreb/machine-learning-using-tensorflow/blob/master/scripts/03_nonlinear_regression.py)
+* [03\_nonlinear\_regression.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/scripts/03_nonlinear_regression.py)
 
 ## References
 

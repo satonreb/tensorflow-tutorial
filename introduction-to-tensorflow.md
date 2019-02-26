@@ -8,7 +8,7 @@ TensorFlow is an open-source software library from Google for numerical computat
 
 * use variety of programming languages to build deep learning models, as it has Python, C++, Java and Go APIs,
 * deploy computation to one or more CPUs or GPUs in a desktop, server, or mobile device with a single API,
-* visualise learning, embeddings, graphs and histograms using [TensorBoard](https://www.tensorflow.org/get_started/summaries_and_tensorboard),
+* visualize learning, embedding, graphs and histograms using [TensorBoard](https://www.tensorflow.org/get_started/summaries_and_tensorboard),
 * forget about derivative computations by hand as it has [auto-differentiation](http://www.columbia.edu/~ahd2125/post/2015/12/5/).
 
 In addition, it has a large community and many projects are already using TensorFlow.
@@ -101,7 +101,7 @@ TensorFlow takes in Python native types such as Python boolean, numeric values \
 
 ## Code
 
-* [00\_first\_step.py](https://github.com/satonreb/machine-learning-using-tensorflow/blob/master/scripts/00_first_step.py)
+* [00\_first\_step.py](https://github.com/satonreb/tensorflow-tutorial/blob/master/scripts/00_first_step.py)
 
 ## References
 
@@ -112,6 +112,6 @@ TensorFlow takes in Python native types such as Python boolean, numeric values \
 * [Keras](https://keras.io/)
 * [Jupyter](http://jupyter.org/)
 * [LearningTensorFlow.com](https://learningtensorflow.com/)
-* [TensorFlow](https://github.com/satonreb/machine-learning-using-tensorflow/tree/3fe10c6bcd8a0b492eca7cfd4216abfe873d47a5/www.tensorflow.org)
+* [TensorFlow](https://github.com/satonreb/tensorflow-tutorial/tree/3fe10c6bcd8a0b492eca7cfd4216abfe873d47a5/www.tensorflow.org)
 * Wikipedia article on [Tensor](https://en.wikipedia.org/wiki/Tensor)
 
