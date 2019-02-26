@@ -1,0 +1,8 @@
+# Concluding Remarks
+
+As it was mentioned in the Introduction, this tutorial contains a brief description of how to use TensorFlow for machine learning tasks. We tried to show that using TensorFlow it is easy to switch from simple linear to highly complex models just by adding a few lines of code or even just by passing an additional parameter. This tutorial was not designed to provide answers to questions when, why and if something has to be used. There are a lot of other examples, tutorials, lectures and books that may provide answers to those questions, but in most case, I would suggest to treat all that information with caution and rely on your own knowledge of mathematics and the domain of interest. As models become more complex you subsequently increase the number of hyperparameters, and to find the "best" values you would need to explore a very large hyperparameter space which boundaries does not seem to be well defined at the moment and are also problem dependent.
+
+For this reason, do not assume that the code presented here is the best and only model for the particular problem. The scripts here are provided in order to show how to combine different things in TensorFlow and gives hints where to look for more. Note, TensorFlow is very young and it is rapidly evolving, therefore there are many ways how to perform the same operation and there might be situations that as TensorFlow matures some things will stop working and will be substituted by something else.
+
+Good luck and enjoy building your own models, and do not forget that if your data is bad your model will never perform well. So the more information you have more things you can do.
+
